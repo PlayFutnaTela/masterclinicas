@@ -1,0 +1,69 @@
+/* Estilos de tema para componentes UI */
+
+.card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+}
+
+.popover {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+}
+
+.primary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.primary:hover {
+  background-color: color-mix(in srgb, var(--primary), transparent 10%);
+}
+
+.secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.secondary:hover {
+  background-color: color-mix(in srgb, var(--secondary), transparent 10%);
+}
+
+.muted {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.accent {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.accent:hover {
+  background-color: color-mix(in srgb, var(--accent), transparent 10%);
+}
+
+.destructive {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+.border {
+  border: 1px solid var(--border);
+}
+
+.input {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.ring {
+  box-shadow: 0 0 0 2px var(--ring);
+}

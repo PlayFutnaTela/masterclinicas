@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { SessionProvider } from "next-auth/react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
+import { db } from "@/lib/db";
 
 export default async function DashboardLayout({
     children,
@@ -12,15 +13,23 @@ export default async function DashboardLayout({
 }) {
     const session = await auth();
 
-    if (!session) {
+    if (!session || !session.user.organizationId) {
         redirect("/login");
     }
+
+    // ===== MULTI-TENANT: Buscar nome da organização =====
+    const organization = await db.organization.findUnique({
+        where: { id: session.user.organizationId },
+        select: { name: true },
+    });
+
+    const clinicName = organization?.name || "Minha Clínica";
 
     return (
         <SessionProvider session={session}>
             <div className="min-h-screen bg-gray-50">
                 {/* Sidebar */}
-                <Sidebar clinicName={session.user.clinicName || "Minha Clínica"} />
+                <Sidebar clinicName={clinicName} />
 
                 {/* Main Content */}
                 <div className="ml-64">

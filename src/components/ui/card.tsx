@@ -10,9 +10,9 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
         const baseStyles = "rounded-xl";
 
         const variants = {
-            default: "bg-white",
-            bordered: "bg-white border border-gray-200",
-            elevated: "bg-white shadow-lg",
+            default: "bg-card",
+            bordered: "bg-card border border-border",
+            elevated: "bg-card shadow-lg",
         };
 
         return (
@@ -52,7 +52,7 @@ CardContent.displayName = "CardContent";
 // Card Title
 const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
     ({ className = "", children, ...props }, ref) => (
-        <h3 ref={ref} className={`text-lg font-semibold text-gray-900 ${className}`} {...props}>
+        <h3 ref={ref} className={`text-lg font-semibold text-foreground ${className}`} {...props}>
             {children}
         </h3>
     )
@@ -62,7 +62,7 @@ CardTitle.displayName = "CardTitle";
 // Card Description
 const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
     ({ className = "", children, ...props }, ref) => (
-        <p ref={ref} className={`text-sm text-gray-500 mt-1 ${className}`} {...props}>
+        <p ref={ref} className={`text-sm text-muted-foreground mt-1 ${className}`} {...props}>
             {children}
         </p>
     )
