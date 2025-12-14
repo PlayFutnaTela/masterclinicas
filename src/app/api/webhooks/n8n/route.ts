@@ -1,7 +1,8 @@
-// Webhook endpoint para receber dados do n8n
+// Webhook endpoint para receber dados do n8n - Multi-Tenant
 // Eventos: novo lead, lead qualificado, agendamento, métricas
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { validateUserOrganization } from "@/lib/org-middleware";
 
 // Tipos de eventos aceitos
 type WebhookEventType =
@@ -13,6 +14,7 @@ type WebhookEventType =
 interface WebhookPayload {
     type: WebhookEventType;
     apiKey: string;
+    organizationId: string; // ===== MULTI-TENANT: Adicionar organizationId ao payload =====
     data: Record<string, unknown>;
 }
 
@@ -32,6 +34,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ===== MULTI-TENANT: Validar organizationId no payload =====
+        if (!body.organizationId) {
+            return NextResponse.json(
+                { error: "organizationId é obrigatório" },
+                { status: 400 }
+            );
+        }
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         // Validar API key e obter usuário
         const user = await prisma.user.findUnique({
             where: { apiKey: body.apiKey },
@@ -44,6 +55,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ===== MULTI-TENANT: Validar que o usuário pertence à organização =====
+        await validateUserOrganization(user.id, body.organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         // Processar evento por tipo
         switch (body.type) {
             case "new_lead": {
@@ -55,6 +70,7 @@ export async function POST(request: NextRequest) {
                         source: (body.data.source as string) || "n8n",
                         status: "novo",
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -64,6 +80,7 @@ export async function POST(request: NextRequest) {
                         type: "lead_received",
                         metadata: { leadId: lead.id },
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -79,8 +96,25 @@ export async function POST(request: NextRequest) {
                     );
                 }
 
+                // ===== MULTI-TENANT: Validar que o lead pertence à organização =====
+                const lead = await prisma.lead.findFirst({
+                    where: {
+                        id: leadId,
+                        userId: user.id,
+                        organizationId: body.organizationId,
+                    },
+                });
+
+                if (!lead) {
+                    return NextResponse.json(
+                        { error: "Lead não encontrado ou não pertence a esta organização" },
+                        { status: 404 }
+                    );
+                }
+                // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
                 await prisma.lead.update({
-                    where: { id: leadId, userId: user.id },
+                    where: { id: leadId },
                     data: { status: "qualificado" },
                 });
 
@@ -89,6 +123,7 @@ export async function POST(request: NextRequest) {
                         type: "qualified",
                         metadata: { leadId },
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -108,9 +143,26 @@ export async function POST(request: NextRequest) {
                     );
                 }
 
+                // ===== MULTI-TENANT: Validar que o lead pertence à organização =====
+                const lead = await prisma.lead.findFirst({
+                    where: {
+                        id: leadId,
+                        userId: user.id,
+                        organizationId: body.organizationId,
+                    },
+                });
+
+                if (!lead) {
+                    return NextResponse.json(
+                        { error: "Lead não encontrado ou não pertence a esta organização" },
+                        { status: 404 }
+                    );
+                }
+                // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
                 // Atualizar status do lead
                 await prisma.lead.update({
-                    where: { id: leadId, userId: user.id },
+                    where: { id: leadId },
                     data: { status: "agendado" },
                 });
 
@@ -121,6 +173,7 @@ export async function POST(request: NextRequest) {
                         scheduledAt: new Date(scheduledAt),
                         status: "agendado",
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -129,6 +182,7 @@ export async function POST(request: NextRequest) {
                         type: "scheduled",
                         metadata: { leadId, appointmentId: appointment.id },
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -156,6 +210,7 @@ export async function POST(request: NextRequest) {
                         type: eventType as "lead_received" | "qualified" | "scheduled" | "no_show" | "follow_up" | "conversion",
                         metadata: metadata || {},
                         userId: user.id,
+                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                     },
                 });
 
@@ -170,9 +225,15 @@ export async function POST(request: NextRequest) {
         }
     } catch (error) {
         console.error("[WEBHOOK N8N] Erro:", error);
+
+        // ===== MULTI-TENANT: Mensagem de erro em português =====
+        const errorMessage = error instanceof Error
+            ? error.message
+            : "Erro interno do servidor";
+
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
-            { status: 500 }
+            { error: errorMessage },
+            { status: error instanceof Error && error.message.includes("Acesso negado") ? 403 : 500 }
         );
     }
 }

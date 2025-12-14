@@ -1,7 +1,8 @@
-// API Route para gerenciamento de agendamentos
+// API Route para gerenciamento de agendamentos - Multi-Tenant
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { validateUserOrganization } from "@/lib/org-middleware";
 import { AppointmentStatus } from "@prisma/client";
 
 /**
@@ -15,6 +16,18 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get("page") || "1");
         const limit = parseInt(searchParams.get("limit") || "10");
@@ -26,10 +39,12 @@ export async function GET(request: NextRequest) {
 
         const where: {
             userId: string;
+            organizationId: string;
             status?: AppointmentStatus;
             scheduledAt?: { gte?: Date; lte?: Date };
         } = {
             userId: session.user.id,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
         };
 
         if (status) {
@@ -91,6 +106,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const body = await request.json();
         const { leadId, scheduledAt, notes } = body;
 
@@ -101,9 +128,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Verificar se o lead pertence ao usuário
+        // Verificar se o lead pertence ao usuário E à organização
         const lead = await prisma.lead.findFirst({
-            where: { id: leadId, userId: session.user.id },
+            where: {
+                id: leadId,
+                userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+            },
         });
 
         if (!lead) {
@@ -126,6 +157,7 @@ export async function POST(request: NextRequest) {
                 scheduledAt: new Date(scheduledAt),
                 notes,
                 userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
 
@@ -135,6 +167,7 @@ export async function POST(request: NextRequest) {
                 type: "scheduled",
                 metadata: { leadId, appointmentId: appointment.id },
                 userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
 
@@ -162,6 +195,18 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const body = await request.json();
         const { id, status, notes } = body;
 
@@ -180,7 +225,11 @@ export async function PATCH(request: NextRequest) {
         if (notes !== undefined) updateData.notes = notes;
 
         const appointment = await prisma.appointment.update({
-            where: { id, userId: session.user.id },
+            where: {
+                id,
+                userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+            },
             data: updateData,
         });
 
@@ -191,6 +240,7 @@ export async function PATCH(request: NextRequest) {
                     type: "no_show",
                     metadata: { appointmentId: id },
                     userId: session.user.id,
+                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                 },
             });
         }

@@ -1,27 +1,30 @@
-// Tipos personalizados para NextAuth
-import "next-auth";
-import { DefaultSession } from "next-auth";
+import NextAuth from "next-auth";
+import { UserRole } from "@prisma/client";
 
 declare module "next-auth" {
-    interface Session {
-        user: {
-            id: string;
-            clinicName: string;
-            role: string;
-        } & DefaultSession["user"];
-    }
+  interface User {
+    id: string;
+    email: string;
+    name: string;
+    organizationId: string;
+    userRole: UserRole;
+  }
 
-    interface User {
-        id: string;
-        clinicName?: string;
-        role?: string;
-    }
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      organizationId: string;
+      userRole: UserRole;
+    };
+  }
 }
 
 declare module "next-auth/jwt" {
-    interface JWT {
-        id?: string;
-        clinicName?: string;
-        role?: string;
-    }
+  interface JWT {
+    id?: string;
+    organizationId?: string;
+    userRole?: UserRole;
+  }
 }

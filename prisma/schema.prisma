@@ -1,4 +1,4 @@
-// Prisma Schema - Plataforma SaaS para Clínicas de Estética
+// Prisma Schema - Plataforma SaaS para Clínicas de Estética (Multi-Tenant)
 
 generator client {
   provider = "prisma-client-js"
@@ -9,48 +9,91 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Usuário (clínica) - multi-tenant
-model User {
-  id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
-  password   String   // Hash bcrypt
-  clinicName String
-  role       String   @default("admin") // admin, staff
+// Organização (Clínica) - Tenant
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
   whatsappLink String?
-  webhookUrl   String? // URL do n8n
-  apiKey       String? @unique // Chave de integração
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  webhookUrl   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  // Relacionamentos
+  users        UserOrganization[]
   leads        Lead[]
   appointments Appointment[]
   metricEvents MetricEvent[]
+
+  @@map("organizations")
+  @@index([slug])
+}
+
+// Associação User <-> Organization (com roles)
+model UserOrganization {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  role           UserRole @default(operador)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, organizationId])
+  @@map("user_organizations")
+  @@index([userId])
+  @@index([organizationId])
+}
+
+enum UserRole {
+  admin
+  gerente
+  operador
+}
+
+// Usuário (global)
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizations UserOrganization[]
+  leads         Lead[]
+  appointments  Appointment[]
+  metricEvents  MetricEvent[]
 
   @@map("users")
 }
 
 // Lead - potencial cliente
 model Lead {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String
-  procedure String   // Procedimento de interesse
-  status    LeadStatus @default(novo)
-  source    String?  // Origem do lead (Instagram, Google, etc.)
-  notes     String?  // Observações
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String     @id @default(cuid())
+  name           String
+  phone          String
+  procedure      String
+  status         LeadStatus @default(novo)
+  source         String?
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  // Multi-tenant
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Relacionamentos
-  appointments Appointment[]
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appointments   Appointment[]
 
   @@map("leads")
+  @@index([organizationId])
+  @@index([userId])
 }
 
 enum LeadStatus {
@@ -62,22 +105,25 @@ enum LeadStatus {
 
 // Agendamento
 model Appointment {
-  id          String            @id @default(cuid())
-  scheduledAt DateTime
-  status      AppointmentStatus @default(agendado)
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  scheduledAt    DateTime
+  status         AppointmentStatus @default(agendado)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  // Relacionamentos
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Multi-tenant (via lead)
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId         String
+  lead           Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("appointments")
+  @@index([organizationId])
+  @@index([userId])
 }
 
 enum AppointmentStatus {
@@ -90,16 +136,20 @@ enum AppointmentStatus {
 
 // Eventos de métrica para analytics
 model MetricEvent {
-  id        String          @id @default(cuid())
-  type      MetricEventType
-  metadata  Json?           // Dados extras do evento
-  createdAt DateTime        @default(now())
+  id             String          @id @default(cuid())
+  type           MetricEventType
+  metadata       Json?
+  createdAt      DateTime        @default(now())
 
-  // Multi-tenant
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("metric_events")
+  @@index([organizationId])
+  @@index([userId])
 }
 
 enum MetricEventType {

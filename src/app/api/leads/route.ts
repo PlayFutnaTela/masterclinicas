@@ -1,7 +1,8 @@
-// API Route para gerenciamento de leads
+// API Route para gerenciamento de leads - Multi-Tenant
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { validateUserOrganization } from "@/lib/org-middleware";
 import { LeadStatus } from "@prisma/client";
 
 /**
@@ -15,6 +16,18 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get("page") || "1");
         const limit = parseInt(searchParams.get("limit") || "10");
@@ -25,10 +38,12 @@ export async function GET(request: NextRequest) {
 
         const where: {
             userId: string;
+            organizationId: string;
             status?: LeadStatus;
             OR?: Array<{ name: { contains: string; mode: "insensitive" } } | { phone: { contains: string } }>;
         } = {
             userId: session.user.id,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
         };
 
         if (status) {
@@ -87,6 +102,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const body = await request.json();
         const { name, phone, procedure, source, notes } = body;
 
@@ -105,6 +132,7 @@ export async function POST(request: NextRequest) {
                 source: source || "manual",
                 notes,
                 userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
 
@@ -114,6 +142,7 @@ export async function POST(request: NextRequest) {
                 type: "lead_received",
                 metadata: { leadId: lead.id, source: "manual" },
                 userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
 
@@ -138,6 +167,18 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // ===== MULTI-TENANT: Validar organização do usuário =====
+        const organizationId = session.user.organizationId;
+        if (!organizationId) {
+            return NextResponse.json(
+                { error: "Organização não encontrada na sessão" },
+                { status: 400 }
+            );
+        }
+
+        await validateUserOrganization(session.user.id, organizationId);
+        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+
         const body = await request.json();
         const { id, status, notes } = body;
 
@@ -156,7 +197,11 @@ export async function PATCH(request: NextRequest) {
         if (notes !== undefined) updateData.notes = notes;
 
         const lead = await prisma.lead.update({
-            where: { id, userId: session.user.id },
+            where: {
+                id,
+                userId: session.user.id,
+                organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+            },
             data: updateData,
         });
 
@@ -167,6 +212,7 @@ export async function PATCH(request: NextRequest) {
                     type: "qualified",
                     metadata: { leadId: id },
                     userId: session.user.id,
+                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                 },
             });
         }

@@ -13,6 +13,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { ThemeToggleButton } from "./theme-toggle-button";
 
 interface NavItem {
     label: string;
@@ -94,8 +95,9 @@ export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
                 })}
             </nav>
 
-            {/* Logout */}
+            {/* Theme Toggle and Logout */}
             <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100">
+                <ThemeToggleButton />
                 <button
                     onClick={() => signOut({ callbackUrl: "/login" })}
                     className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200"

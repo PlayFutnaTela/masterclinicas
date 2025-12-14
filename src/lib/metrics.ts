@@ -1,4 +1,4 @@
-// Utilitários de métricas para agregação de dados
+// Utilitários de métricas para agregação de dados - Multi-Tenant
 import { prisma } from "./db";
 import { MetricEventType } from "@prisma/client";
 
@@ -22,12 +22,14 @@ interface MetricsOverTime {
 export async function getMetricsSummary(
     userId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ): Promise<MetricsSummary> {
     const events = await prisma.metricEvent.groupBy({
         by: ["type"],
         where: {
             userId,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
             createdAt: {
                 gte: startDate,
                 lte: endDate,
@@ -49,19 +51,19 @@ export async function getMetricsSummary(
     events.forEach((event) => {
         switch (event.type) {
             case "lead_received":
-                summary.leadsReceived = event._count.type;
+                summary.leadsReceived += event._count.type;
                 break;
             case "qualified":
-                summary.qualified = event._count.type;
+                summary.qualified += event._count.type;
                 break;
             case "scheduled":
-                summary.scheduled = event._count.type;
+                summary.scheduled += event._count.type;
                 break;
             case "no_show":
-                summary.noShow = event._count.type;
+                summary.noShow += event._count.type;
                 break;
             case "conversion":
-                summary.conversions = event._count.type;
+                summary.conversions += event._count.type;
                 break;
         }
     });
@@ -70,97 +72,126 @@ export async function getMetricsSummary(
 }
 
 /**
- * Obtém dados de métricas ao longo do tempo para gráficos
+ * Obtém métricas ao longo do tempo para um usuário
  */
 export async function getMetricsOverTime(
     userId: string,
     startDate: Date,
     endDate: Date,
-    eventType?: MetricEventType
+    eventType?: MetricEventType,
+    organizationId?: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ): Promise<MetricsOverTime[]> {
-    const whereClause: {
-        userId: string;
-        createdAt: { gte: Date; lte: Date };
-        type?: MetricEventType;
-    } = {
-        userId,
-        createdAt: {
-            gte: startDate,
-            lte: endDate,
-        },
-    };
-
-    if (eventType) {
-        whereClause.type = eventType;
-    }
-
     const events = await prisma.metricEvent.findMany({
-        where: whereClause,
+        where: {
+            userId,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+            createdAt: {
+                gte: startDate,
+                lte: endDate,
+            },
+            ...(eventType && { type: eventType }),
+        },
         orderBy: { createdAt: "asc" },
     });
 
-    // Agrupar por data
-    const grouped = events.reduce((acc, event) => {
-        const dateKey = event.createdAt.toISOString().split("T")[0];
-        const key = `${dateKey}-${event.type}`;
+    // Agrupar por data e tipo
+    const grouped = new Map<string, { count: number; type: MetricEventType }>();
 
-        if (!acc[key]) {
-            acc[key] = {
-                date: dateKey,
-                count: 0,
-                type: event.type,
-            };
+    events.forEach((event) => {
+        const date = event.createdAt.toLocaleDateString("pt-BR");
+        const key = `${date}-${event.type}`;
+
+        if (grouped.has(key)) {
+            const existing = grouped.get(key)!;
+            existing.count += 1;
+        } else {
+            grouped.set(key, { count: 1, type: event.type });
         }
-        acc[key].count++;
-        return acc;
-    }, {} as Record<string, MetricsOverTime>);
+    });
 
-    return Object.values(grouped);
+    return Array.from(grouped.entries()).map(([_, value]) => ({
+        date: value.type,
+        count: value.count,
+        type: value.type,
+    }));
 }
 
 /**
- * Conta leads por status para um usuário
+ * Obtém contagem de leads por status
  */
-export async function getLeadsByStatus(userId: string) {
-    return prisma.lead.groupBy({
+export async function getLeadsByStatus(
+    userId: string,
+    organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
+) {
+    return await prisma.lead.groupBy({
         by: ["status"],
-        where: { userId },
-        _count: { status: true },
+        where: {
+            userId,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+        },
+        _count: {
+            status: true,
+        },
     });
 }
 
 /**
- * Conta agendamentos por status para um usuário
+ * Obtém contagem de agendamentos por status
  */
-export async function getAppointmentsByStatus(userId: string) {
-    return prisma.appointment.groupBy({
+export async function getAppointmentsByStatus(
+    userId: string,
+    organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
+) {
+    return await prisma.appointment.groupBy({
         by: ["status"],
-        where: { userId },
-        _count: { status: true },
+        where: {
+            userId,
+            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+        },
+        _count: {
+            status: true,
+        },
     });
 }
 
 /**
- * Obtém dados para os cards do dashboard
+ * Cards do dashboard com dados agregados
  */
-export async function getDashboardCards(userId: string) {
-    const [totalLeads, qualifiedLeads, scheduledAppointments, todayAppointments] =
-        await Promise.all([
-            prisma.lead.count({ where: { userId } }),
-            prisma.lead.count({ where: { userId, status: "qualificado" } }),
-            prisma.appointment.count({
-                where: { userId, status: { in: ["agendado", "confirmado"] } },
-            }),
-            prisma.appointment.count({
-                where: {
-                    userId,
-                    scheduledAt: {
-                        gte: new Date(new Date().setHours(0, 0, 0, 0)),
-                        lt: new Date(new Date().setHours(23, 59, 59, 999)),
-                    },
+export async function getDashboardCards(
+    userId: string,
+    organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
+) {
+    const where = {
+        userId,
+        organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+    };
+
+    const [
+        totalLeads,
+        qualifiedLeads,
+        scheduledAppointments,
+        todayAppointments,
+    ] = await Promise.all([
+        prisma.lead.count({ where }),
+        prisma.lead.count({
+            where: { ...where, status: "qualificado" },
+        }),
+        prisma.appointment.count({
+            where: {
+                ...where,
+                status: { in: ["agendado", "confirmado"] },
+            },
+        }),
+        prisma.appointment.count({
+            where: {
+                ...where,
+                scheduledAt: {
+                    gte: new Date(new Date().setHours(0, 0, 0, 0)),
+                    lt: new Date(new Date().setHours(23, 59, 59, 999)),
                 },
-            }),
-        ]);
+            },
+        }),
+    ]);
 
     return {
         totalLeads,
