@@ -1,0 +1,112 @@
+// Prisma Schema - Plataforma SaaS para Clínicas de Estética
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuário (clínica) - multi-tenant
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  password   String   // Hash bcrypt
+  clinicName String
+  role       String   @default("admin") // admin, staff
+  whatsappLink String?
+  webhookUrl   String? // URL do n8n
+  apiKey       String? @unique // Chave de integração
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relacionamentos
+  leads        Lead[]
+  appointments Appointment[]
+  metricEvents MetricEvent[]
+
+  @@map("users")
+}
+
+// Lead - potencial cliente
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  procedure String   // Procedimento de interesse
+  status    LeadStatus @default(novo)
+  source    String?  // Origem do lead (Instagram, Google, etc.)
+  notes     String?  // Observações
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Multi-tenant
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relacionamentos
+  appointments Appointment[]
+
+  @@map("leads")
+}
+
+enum LeadStatus {
+  novo
+  qualificado
+  agendado
+  perdido
+}
+
+// Agendamento
+model Appointment {
+  id          String            @id @default(cuid())
+  scheduledAt DateTime
+  status      AppointmentStatus @default(agendado)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relacionamentos
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // Multi-tenant (via lead)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  agendado
+  confirmado
+  realizado
+  cancelado
+  no_show
+}
+
+// Eventos de métrica para analytics
+model MetricEvent {
+  id        String          @id @default(cuid())
+  type      MetricEventType
+  metadata  Json?           // Dados extras do evento
+  createdAt DateTime        @default(now())
+
+  // Multi-tenant
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("metric_events")
+}
+
+enum MetricEventType {
+  lead_received
+  qualified
+  scheduled
+  no_show
+  follow_up
+  conversion
+}
