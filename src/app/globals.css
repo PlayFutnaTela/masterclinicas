@@ -55,6 +55,15 @@ body {
   font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif;
 }
 
+/* Smooth scrolling for in-page anchors and avoid fixed header overlap */
+html {
+  scroll-behavior: smooth;
+}
+
+#features {
+  scroll-margin-top: 80px; /* space for the fixed navbar */
+}
+
 /* Custom styles used by the marketing landing */
 .glass-nav {
   background: rgba(255, 255, 255, 0.9);

@@ -57,10 +57,12 @@ export default function HomePage() {
                 Entrar
               </Link>
               <a
-                href="/login"
+                href="https://wa.me/5511994299814?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20como%20transformar%20minha%20clicnica%20por%20favor"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                Teste Grátis
+                Saiba Mais
               </a>
             </div>
           </div>
@@ -90,7 +92,7 @@ export default function HomePage() {
       </header>
 
       {/* Feature cards (grid like provided) */}
-      <section className="relative z-20 -mt-32 px-4 sm:px-6 lg:px-8 pb-24">
+      <section id="features" className="relative z-20 -mt-32 px-4 sm:px-6 lg:px-8 pb-24">
         <div className="max-w-7xl mx-auto bg-white dark:bg-surface-dark rounded-3xl shadow-soft p-6 md:p-10 border" style={{ borderColor: 'var(--primary-dark)' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -98,7 +100,7 @@ export default function HomePage() {
                 <img src="/assets/People/SVG/ic_fluent_people_48_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Qualificação dos leads</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">MasterClínicas completa para gerenciar e expandir sua operação.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">MasterClínicas completa para gerenciar e expandir sua operação.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -106,7 +108,7 @@ export default function HomePage() {
                 <img src="/assets/Calendar/SVG/ic_fluent_calendar_48_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Agendamentos e automações</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Conecte agendamentos, lembretes e confirmações automáticas.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Conecte agendamentos, lembretes e confirmações automáticas.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -114,7 +116,7 @@ export default function HomePage() {
                 <img src="/assets/Gauge/SVG/ic_fluent_gauge_32_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Automações e métricas</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Integre dados e painéis para medir a performance real da clínica.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Integre dados e painéis para medir a performance real da clínica.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -122,7 +124,7 @@ export default function HomePage() {
                 <img src="/assets/Checkbox/SVG/ic_fluent_checkbox_24_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Confirmações personalizadas</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Comunicações customizadas para diminuir faltas e aumentar conversões.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Comunicações customizadas para diminuir faltas e aumentar conversões.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -130,7 +132,7 @@ export default function HomePage() {
                 <img src="/assets/Code/SVG/ic_fluent_code_24_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Orquestração de fluxos</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Gerencie triggers, webhooks e integrações em um só painel.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Gerencie triggers, webhooks e integrações em um só painel.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -138,7 +140,7 @@ export default function HomePage() {
                 <img src="/assets/Shifts/SVG/ic_fluent_shifts_32_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Sincronizações</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Conecte seus sistemas e mantenha dados consistentes em tempo real.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Conecte seus sistemas e mantenha dados consistentes em tempo real.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -146,7 +148,7 @@ export default function HomePage() {
                 <img src="/assets/Link/SVG/ic_fluent_link_32_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Percursos e jornadas</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Defina fluxos e jornadas dos seus pacientes desde o primeiro contato.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Defina fluxos e jornadas dos seus pacientes desde o primeiro contato.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -154,7 +156,7 @@ export default function HomePage() {
                 <img src="/assets/Receipt/SVG/ic_fluent_receipt_32_color.svg" alt="" className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#ee224a] mb-2">Faturamento e pagamentos</h3>
-              <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Controle cobranças, pacotes e relatórios financeiros com facilidade.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Controle cobranças, pacotes e relatórios financeiros com facilidade.</p>
             </div>
           </div>
         </div>
@@ -202,12 +204,17 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-16 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-2xl font-bold text-gray-900">Pronto para testar a plataforma?</h3>
-          <p className="mt-2 text-gray-700">Sem cartão de crédito. Comece em minutos e veja o impacto no seu fluxo.</p>
+          <h3 className="text-2xl font-bold text-[#ee224a] mb-3">Pronto para transformar a gestão da sua clínica?</h3>
+          <p className="mt-2 text-gray-700">Comece agora, fale com um especialista. Em poucos minutos, você já vê impacto real nos seus agendamentos e no fluxo de atendimento.</p>
           <div className="mt-6">
-            <Link href="/login" className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+            <a
+              href="https://wa.me/5511994299814?text=Ol%C3%A1%2C%20gostaria%20de%20transformar%20a%20minha%20clinica"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200"
+            >
               Começar Agora
-            </Link>
+            </a>
           </div>
         </div>
       </section>
