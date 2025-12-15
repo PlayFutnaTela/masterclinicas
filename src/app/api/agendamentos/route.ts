@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
+        // Buscar role E organizationId do usuário no banco
         const userRecord = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { role: true },
+            select: { role: true, organizationId: true },
         });
 
         if (!userRecord) {
@@ -29,31 +29,32 @@ export async function GET(request: NextRequest) {
         }
 
         const userRole = userRecord.role;
+        let organizationId: string | null = null;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver agendamentos =====
         requireRole(userRole, "operador");
 
-        // Para usuários não super-admin, usar organização padrão
-        let organizationId: string | null = null;
+        // Determinar organizationId baseado no role do usuário
         if (userRole === "super_admin") {
-            // Super admin pode ver agendamentos de todas as organizações
-            // Se não especificar organização, mostrar todas
+            // Super admin pode ver agendamentos de todas as organizações (ou especificar uma via query param)
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId");
         } else {
-            // Admin/operador vê apenas da organização padrão
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            organizationId = defaultOrg?.id || null;
+            // Admin/operador vê apenas da sua organização associada
+            organizationId = userRecord.organizationId;
         }
 
+        // Se não houver organização, retornar lista vazia
         if (!organizationId) {
-            return NextResponse.json(
-                { error: "Organização não encontrada" },
-                { status: 400 }
-            );
+            return NextResponse.json({
+                appointments: [],
+                pagination: {
+                    page: 1,
+                    limit: 10,
+                    total: 0,
+                    totalPages: 0,
+                },
+            });
         }
 
         const { searchParams } = new URL(request.url);
@@ -66,13 +67,11 @@ export async function GET(request: NextRequest) {
         const skip = (page - 1) * limit;
 
         const where: {
-            userId: string;
             organizationId: string;
             status?: AppointmentStatus;
             scheduledAt?: { gte?: Date; lte?: Date };
         } = {
-            userId: user.id,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
+            organizationId, // ===== MULTI-TENANT: Filtrar por organizationId apenas =====
         };
 
         if (status) {
@@ -81,8 +80,12 @@ export async function GET(request: NextRequest) {
 
         if (startDate || endDate) {
             where.scheduledAt = {};
-            if (startDate) where.scheduledAt.gte = new Date(startDate);
-            if (endDate) where.scheduledAt.lte = new Date(endDate);
+            try {
+                if (startDate) where.scheduledAt.gte = new Date(startDate);
+                if (endDate) where.scheduledAt.lte = new Date(endDate);
+            } catch (dateError) {
+                console.error("[API AGENDAMENTOS] Erro ao parsear datas:", dateError);
+            }
         }
 
         const [appointments, total] = await Promise.all([
@@ -115,9 +118,10 @@ export async function GET(request: NextRequest) {
             },
         });
     } catch (error) {
-        console.error("[API AGENDAMENTOS] Erro:", error);
+        console.error("[API AGENDAMENTOS] GET - Erro completo:", error);
+        console.error("[API AGENDAMENTOS] GET - Stack:", error instanceof Error ? error.stack : "N/A");
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
