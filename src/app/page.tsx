@@ -73,7 +73,7 @@ export default function HomePage() {
           <img
             alt="Clinic background"
             className="w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVi4wol4OlvyBBHatJBRaa87Y6UwOVwljJDsjqYO5UrHfl_Su4sUP0KKThjIsIveR-i6MN5MCg96wdX1ysmQVeWMMwVtiBNhKuBSw11-TH3DNPtE1NVogzKeNvZ-FKro2QvbCpiYlBFOos7eM3iAii99ns30Zh_H0FnNdEh-OVoCAbtdMtqB6oOrFoErKpVFFDIcpvQF-mmvkA_MyE8Qmq3Kl4moYReK-r3Ct2ZQaDALT6i7SbVg__H9UBCMoiaycnZjjNAJjPDjQ"
+            src="https://i.postimg.cc/ZnsJpRXK/hero1.jpg"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-gray-900/80 via-gray-900/70 to-gray-900/90 mix-blend-multiply"></div>
           <div className="absolute inset-0 mix-blend-overlay" style={{ backgroundColor: 'rgba(194,69,100,0.08)' }}></div>
@@ -171,7 +171,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-16">
             <div className="flex flex-col items-center text-center group">
               <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
-                <img alt="Conexão Grátis" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4zfWrkEQLd9EuUoI1ORuMOXTwyKdK5z1yaYTIt6ibrVq0PfItOka2-iMWQN5AvgNGjxqRGs15-DND6o9aleHtydiCpVCI3smCo4tRHAK-fPJ5y1er2nhiyeL4vABXPJx_Uc63Aq-ihMR9N6guUo_ZPgEMZpUrxhC1rzsPdX_k72m540SJRE_Bp-tGlOHBfFIqjm6Ba2RL-zJ56i0ykiBXdqC1AiRjQROG1YXNw4NoNdwwJ0vY0GsyZQ5azheDkKkf9-d7I9uTu8w"/>
+                <img alt="Conexão Grátis" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://i.postimg.cc/JhR6jq8k/1.jpg"/>
                 <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">1</div>
               </div>
               <h3 className="text-2xl font-bold text-[#ee224a] mb-3">1. Conecte sua clínica</h3>
@@ -180,7 +180,7 @@ export default function HomePage() {
 
             <div className="flex flex-col items-center text-center group">
               <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
-                <img alt="Definir Agendamento" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASpBK3xXfKfhwbsXrEObdW7y6-ojZs_bnpM-bk5WgNLddkwHxoG2stUDmFddnR5wrRVNcbdSiqaK1jFINroD66X8zwWw_AvovkIo2xxv9Y6XG2EO0wF-Bt1AE4RrSgl6SRx1R75g8cldPVecGkZoxlxkxPC3C1TJFdI9zdMZUw4EWrBqA3YhYnS0nqIHS8iSieqGqWgLeGeaywLUQHlSuDIHiKhjfI5BvJNVKRrjGbVK09RkCvdbBnY6UzMzJmxGnT4pr1Tt-ymI8"/>
+                <img alt="Definir Agendamento" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://i.postimg.cc/8CTKLHGv/2.jpg"/>
                 <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">2</div>
               </div>
               <h3 className="text-2xl font-bold text-[#ee224a] mb-3">2. Transforme conversas em agendamentos</h3>
@@ -189,7 +189,7 @@ export default function HomePage() {
 
             <div className="flex flex-col items-center text-center group">
               <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
-                <img alt="Automações e Métricas" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrMJVDEO2vT8gSHvaTg-OixgnW7DjzRS4Q1T1GGVh3wqlMaHcI103SF6wSxdFnq5q67kf77c-WyvNOA8XN6YIWNrmoqshk6xHnt78lWKkDC_iIUSMfhBzYhYlEKaealGZgy7JCSJfR0ZX2jYFFUQMrnk_vDrx66kl4O_nbuCyya-xH3f6fFVuKdZlm072k-N3jmjfDplnEfaEbrUFbCaTVDUdcBHzEEbBnCEUo9H7_CRaNOoTWM_t9lFeJ9jGOVkAmFGvWa9S2B4k"/>
+                <img alt="Automações e Métricas" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://i.postimg.cc/1zyCDHSG/2.png"/>
                 <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">3</div>
               </div>
               <h3 className="text-2xl font-bold text-[#ee224a] mb-3">3. Acompanhe resultados e cresça com controle</h3>
