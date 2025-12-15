@@ -1,4 +1,4 @@
-// Página de Login
+// Página de Login e Registro
 "use client";
 
 import { useState } from "react";
@@ -14,13 +14,17 @@ export default function LoginPage() {
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
+    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [name, setName] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setIsLoading(true);
@@ -44,6 +48,54 @@ export default function LoginPage() {
         }
     };
 
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        setSuccess("");
+        setIsLoading(true);
+
+        if (password !== confirmPassword) {
+            setError("As senhas não coincidem");
+            setIsLoading(false);
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("A senha deve ter pelo menos 6 caracteres");
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    name,
+                    email,
+                    password,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setSuccess("Conta criada com sucesso! Você pode fazer login agora.");
+                setIsLogin(true);
+                setPassword("");
+                setConfirmPassword("");
+            } else {
+                setError(data.error || "Erro ao criar conta");
+            }
+        } catch {
+            setError("Erro ao criar conta. Tente novamente.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-rose-50 flex items-center justify-center p-4">
             <div className="w-full max-w-md">
@@ -53,12 +105,57 @@ export default function LoginPage() {
                         <Sparkles className="w-8 h-8 text-white" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900">MasterClínicas</h1>
-                    <p className="text-gray-500 mt-1">Acesse sua área administrativa</p>
+                    <p className="text-gray-500 mt-1">
+                        {isLogin ? "Acesse sua área administrativa" : "Crie sua conta"}
+                    </p>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+                    <button
+                        onClick={() => {
+                            setIsLogin(true);
+                            setError("");
+                            setSuccess("");
+                        }}
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                            isLogin
+                                ? "bg-white text-gray-900 shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                        Entrar
+                    </button>
+                    <button
+                        onClick={() => {
+                            setIsLogin(false);
+                            setError("");
+                            setSuccess("");
+                        }}
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                            !isLogin
+                                ? "bg-white text-gray-900 shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                        Criar Conta
+                    </button>
                 </div>
 
                 {/* Form */}
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-5">
+                        {!isLogin && (
+                            <Input
+                                label="Nome completo"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Seu nome completo"
+                                required
+                            />
+                        )}
+
                         <Input
                             label="Email"
                             type="email"
@@ -90,14 +187,31 @@ export default function LoginPage() {
                             </button>
                         </div>
 
+                        {!isLogin && (
+                            <Input
+                                label="Confirmar senha"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                            />
+                        )}
+
                         {error && (
                             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                                 <p className="text-sm text-red-600">{error}</p>
                             </div>
                         )}
 
+                        {success && (
+                            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-sm text-green-600">{success}</p>
+                            </div>
+                        )}
+
                         <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-                            Entrar
+                            {isLogin ? "Entrar" : "Criar Conta"}
                         </Button>
                     </form>
 

@@ -66,8 +66,7 @@ export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
     const { data: session } = useSession();
 
     // ===== MULTI-TENANT: Verificar se é SUPER ADMIN =====
-    const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "admin@masterclínicas.com";
-    const isSuperAdmin = session?.user?.email === SUPER_ADMIN_EMAIL;
+    const isSuperAdmin = session?.user?.role === "super_admin";
 
     return (
         <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200">
