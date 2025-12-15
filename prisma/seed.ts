@@ -1,21 +1,34 @@
-// Seed do banco de dados com dados de exemplo - Simplified Roles
+// Seed do banco de dados com dados de exemplo - Supabase Auth
 import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
+import { createClient } from "@supabase/supabase-js";
 
 const prisma = new PrismaClient();
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 async function main() {
-  console.log("🌱 Iniciando seed com roles simplificados...");
+  console.log("🌱 Iniciando seed com Supabase Auth...");
 
   // ===== Criar SUPER ADMIN (proprietário da plataforma) =====
-  const superAdminHashedPassword = await hash("123456", 12);
+  const { data: superAdminAuth, error: authError } = await supabase.auth.admin.createUser({
+    email: "admin@masterclínicas.com",
+    password: "123456",
+    user_metadata: { name: "Super Admin" },
+  });
+
+  if (authError) {
+    console.error("Erro ao criar usuário no auth:", authError);
+    return;
+  }
 
   const superAdminUser = await prisma.user.upsert({
     where: { email: "admin@masterclínicas.com" },
     update: {},
     create: {
+      id: superAdminAuth.user.id,
       email: "admin@masterclínicas.com",
-      password: superAdminHashedPassword,
       name: "Super Admin",
       role: "super_admin",
     },
@@ -38,36 +51,55 @@ async function main() {
   console.log("✅ Organização criada:", org.name);
 
   // ===== Criar usuário admin da clínica =====
-  const adminHashedPassword = await hash("123456", 12);
-
-  const adminUser = await prisma.user.upsert({
-    where: { email: "admin@clinica.com" },
-    update: {},
-    create: {
-      email: "admin@clinica.com",
-      password: adminHashedPassword,
-      name: "Administrador da Clínica",
-      role: "admin",
-    },
+  const { data: adminAuth, error: adminAuthError } = await supabase.auth.admin.createUser({
+    email: "admin@clinica.com",
+    password: "123456",
+    user_metadata: { name: "Administrador da Clínica" },
   });
 
-  console.log("✅ Usuário admin criado:", adminUser.email);
+  let adminUser;
+  if (adminAuthError) {
+    console.error("Erro ao criar admin no auth:", adminAuthError);
+  } else {
+    adminUser = await prisma.user.upsert({
+      where: { email: "admin@clinica.com" },
+      update: {},
+      create: {
+        id: adminAuth.user.id,
+        email: "admin@clinica.com",
+        name: "Administrador da Clínica",
+        role: "admin",
+        organizationId: org.id,
+      },
+    });
+
+    console.log("✅ Usuário admin criado:", adminUser.email);
+  }
 
   // ===== Criar usuário de teste =====
-  const testHashedPassword = await hash("#Natalia2017", 12);
-
-  const testUser = await prisma.user.upsert({
-    where: { email: "exemplo@exemplo.com" },
-    update: {},
-    create: {
-      email: "exemplo@exemplo.com",
-      password: testHashedPassword,
-      name: "Usuário de Teste",
-      role: "operador",
-    },
+  const { data: testAuth, error: testAuthError } = await supabase.auth.admin.createUser({
+    email: "teste@clinica.com",
+    password: "#Natalia2017",
+    user_metadata: { name: "Usuário de Teste" },
   });
 
-  console.log("✅ Usuário de teste criado:", testUser.email);
+  if (testAuthError) {
+    console.error("Erro ao criar teste no auth:", testAuthError);
+  } else {
+    const testUser = await prisma.user.upsert({
+      where: { email: "teste@clinica.com" },
+      update: {},
+      create: {
+        id: testAuth.user.id,
+        email: "teste@clinica.com",
+        name: "Usuário de Teste",
+        role: "operador",
+        organizationId: org.id,
+      },
+    });
+
+    console.log("✅ Usuário de teste criado:", testUser.email);
+  }
 
   // ===== Criar leads de exemplo com organizationId =====
   const leadData = [
@@ -93,59 +125,61 @@ async function main() {
 
   console.log("✅ Leads criados:", leadData.length);
 
-  // ===== MULTI-TENANT: Criar agendamentos de exemplo com organizationId =====
-  const leads = await prisma.lead.findMany({
-    where: {
-      userId: adminUser.id,
-      organizationId: org.id, // ===== MULTI-TENANT: Adicionar organizationId =====
-      status: "agendado",
-    },
-  });
-
-  for (const lead of leads) {
-    const scheduledAt = new Date();
-    scheduledAt.setDate(scheduledAt.getDate() + Math.floor(Math.random() * 7) + 1);
-    scheduledAt.setHours(9 + Math.floor(Math.random() * 9), 0, 0, 0);
-
-    await prisma.appointment.create({
-      data: {
-        leadId: lead.id,
+  if (adminUser) {
+    // ===== MULTI-TENANT: Criar agendamentos de exemplo com organizationId =====
+    const leads = await prisma.lead.findMany({
+      where: {
         userId: adminUser.id,
         organizationId: org.id, // ===== MULTI-TENANT: Adicionar organizationId =====
-        scheduledAt,
         status: "agendado",
       },
     });
+
+    for (const lead of leads) {
+      const scheduledAt = new Date();
+      scheduledAt.setDate(scheduledAt.getDate() + Math.floor(Math.random() * 7) + 1);
+      scheduledAt.setHours(9 + Math.floor(Math.random() * 9), 0, 0, 0);
+
+      await prisma.appointment.create({
+        data: {
+          leadId: lead.id,
+          userId: adminUser.id,
+          organizationId: org.id, // ===== MULTI-TENANT: Adicionar organizationId =====
+          scheduledAt,
+          status: "agendado",
+        },
+      });
+    }
+
+    console.log("✅ Agendamentos criados:", leads.length);
+
+    // ===== MULTI-TENANT: Criar eventos de métrica de exemplo com organizationId =====
+    const metricTypes = [
+      "lead_received",
+      "qualified",
+      "scheduled",
+      "lead_received",
+      "lead_received",
+      "qualified",
+      "conversion",
+    ] as const;
+
+    for (const type of metricTypes) {
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 30));
+
+      await prisma.metricEvent.create({
+        data: {
+          type,
+          userId: adminUser.id,
+          organizationId: org.id,
+          createdAt
+        });
+      }
+    }
+
+    console.log("✅ Eventos de métrica criados:", metricTypes.length);
   }
-
-  console.log("✅ Agendamentos criados:", leads.length);
-
-  // ===== MULTI-TENANT: Criar eventos de métrica de exemplo com organizationId =====
-  const metricTypes = [
-    "lead_received",
-    "qualified",
-    "scheduled",
-    "lead_received",
-    "lead_received",
-    "qualified",
-    "conversion",
-  ] as const;
-
-  for (const type of metricTypes) {
-    const createdAt = new Date();
-    createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 30));
-
-    await prisma.metricEvent.create({
-      data: {
-        type,
-        userId: adminUser.id,
-        organizationId: org.id, // ===== MULTI-TENANT: Adicionar organizationId =====
-        createdAt,
-      },
-    });
-  }
-
-  console.log("✅ Eventos de métrica criados:", metricTypes.length);
 
   console.log("\n🎉 Seed multi-tenant concluído!");
   

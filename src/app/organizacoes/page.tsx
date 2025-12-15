@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -26,7 +26,8 @@ interface Organization {
 
 export default function OrganizationsPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const supabase = createClient();
+  const [user, setUser] = useState<any>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,8 +41,22 @@ export default function OrganizationsPage() {
     webhookUrl: "",
   });
 
+  // Check auth
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      if (!user) {
+        router.push("/login");
+      }
+    };
+    getUser();
+  }, [supabase, router]);
+
   // ===== MULTI-TENANT: Buscar TODAS as organizações (admin-only) =====
   useEffect(() => {
+    if (!user) return;
+
     const fetchOrganizations = async () => {
       try {
         const response = await fetch("/api/admin/organizations");
@@ -58,10 +73,8 @@ export default function OrganizationsPage() {
       }
     };
 
-    if (status === "authenticated") {
-      fetchOrganizations();
-    }
-  }, [status]);
+    fetchOrganizations();
+  }, [user]);
 
   // ===== MULTI-TENANT: Criar nova organização =====
   const handleCreateOrganization = async (e: React.FormEvent) => {

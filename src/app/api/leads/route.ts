@@ -1,6 +1,6 @@
-// API Route para gerenciamento de leads - Simplified Roles
+// API Route para gerenciamento de leads - Supabase Auth
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/role-middleware";
 import { LeadStatus } from "@prisma/client";
@@ -11,17 +11,31 @@ import { LeadStatus } from "@prisma/client";
  */
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver leads =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
         let organizationId: string | null = null;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             // Super admin pode ver leads de todas as organizações
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId");
@@ -55,7 +69,7 @@ export async function GET(request: NextRequest) {
             status?: LeadStatus;
             OR?: Array<{ name: { contains: string; mode: "insensitive" } } | { phone: { contains: string } }>;
         } = {
-            userId: session.user.id,
+            userId: user.id,
             organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
         };
 
@@ -110,17 +124,31 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem criar leads =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
         let organizationId: string;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             const body = await request.json();
             organizationId = body.organizationId;
             if (!organizationId) {
@@ -160,7 +188,7 @@ export async function POST(request: NextRequest) {
                 procedure: procedure || "",
                 source: source || "manual",
                 notes,
-                userId: session.user.id,
+                userId: user.id,
                 organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
@@ -170,7 +198,7 @@ export async function POST(request: NextRequest) {
             data: {
                 type: "lead_received",
                 metadata: { leadId: lead.id, source: "manual" },
-                userId: session.user.id,
+                userId: user.id,
                 organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
@@ -191,18 +219,33 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem atualizar leads =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
+        let body: any;
         let organizationId: string;
-        if (session.user.role === "super_admin") {
-            const body = await request.json();
+        if (userRole === "super_admin") {
+            body = await request.json();
             organizationId = body.organizationId;
             if (!organizationId) {
                 return NextResponse.json(
@@ -222,15 +265,9 @@ export async function PATCH(request: NextRequest) {
                 );
             }
             organizationId = defaultOrg.id;
-        }
-        if (!organizationId) {
-            return NextResponse.json(
-                { error: "Organização não encontrada" },
-                { status: 400 }
-            );
+            body = await request.json();
         }
 
-        const body = await request.json();
         const { id, status, notes } = body;
 
         if (!id) {
@@ -250,7 +287,7 @@ export async function PATCH(request: NextRequest) {
         const lead = await prisma.lead.update({
             where: {
                 id,
-                userId: session.user.id,
+                userId: user.id,
                 organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
             },
             data: updateData,
@@ -262,7 +299,7 @@ export async function PATCH(request: NextRequest) {
                 data: {
                     type: "qualified",
                     metadata: { leadId: id },
-                    userId: session.user.id,
+                    userId: user.id,
                     organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
                 },
             });

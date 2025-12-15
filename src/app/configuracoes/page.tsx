@@ -1,15 +1,16 @@
-// Página de Configurações
+// Página de Configurações - Supabase Auth
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Save, Copy, RefreshCw, Check, ExternalLink } from "lucide-react";
 
 export default function ConfiguracoesPage() {
-    const { data: session } = useSession();
+    const supabase = createClient();
+    const [user, setUser] = useState<any>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
 
@@ -20,9 +21,18 @@ export default function ConfiguracoesPage() {
         apiKey: "",
     });
 
+    // Get user
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+    }, [supabase]);
+
     useEffect(() => {
         // Carregar configurações do usuário
-        if (session?.user) {
+        if (user) {
             setSettings({
                 clinicName: "",
                 whatsappLink: "",
@@ -30,7 +40,7 @@ export default function ConfiguracoesPage() {
                 apiKey: "",
             });
         }
-    }, [session]);
+    }, [user]);
 
     const handleSave = async () => {
         setIsSaving(true);

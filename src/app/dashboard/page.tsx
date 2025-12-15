@@ -1,5 +1,5 @@
 // Página Visão Geral do Dashboard
-import { auth } from "@/lib/auth";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getDashboardCards, getLeadsByStatus } from "@/lib/metrics";
 import { prisma } from "@/lib/db";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -63,15 +63,27 @@ async function getDashboardData(userId: string, organizationId: string) {
 }
 
 export default async function DashboardPage() {
-    const session = await auth();
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
+        return null;
+    }
+
+    // Buscar role do usuário
+    const { data: userData } = await supabase
+        .from('users')
+        .select('role, organizationId')
+        .eq('id', user.id)
+        .single();
+
+    if (!userData) {
         return null;
     }
 
     // Determinar organização
     let organizationId: string;
-    if (session.user.role === "super_admin") {
+    if (userData.role === "super_admin") {
         // Super admin vê dados de todas as organizações (usar primeira como padrão)
         const org = await prisma.organization.findFirst({
             orderBy: { createdAt: "asc" },
@@ -79,15 +91,11 @@ export default async function DashboardPage() {
         });
         organizationId = org?.id || "";
     } else {
-        // Admin/operador usa organização padrão
-        const org = await prisma.organization.findFirst({
-            orderBy: { createdAt: "asc" },
-            select: { id: true }
-        });
-        organizationId = org?.id || "";
+        // Admin/operador usa organização associada
+        organizationId = userData.organizationId || "";
     }
 
-    const { cards, chartData } = await getDashboardData(session.user.id, organizationId);
+    const { cards, chartData } = await getDashboardData(user.id, organizationId);
 
     return (
         <div className="space-y-6">

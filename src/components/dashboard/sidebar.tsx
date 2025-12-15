@@ -1,9 +1,10 @@
-// Sidebar do Dashboard
+// Sidebar do Dashboard com Supabase Auth
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase";
 import {
     LayoutDashboard,
     Users,
@@ -14,7 +15,6 @@ import {
     Sparkles,
     Building2,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
 import { ThemeToggleButton } from "./theme-toggle-button";
 
 interface NavItem {
@@ -63,10 +63,31 @@ interface SidebarProps {
 
 export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
     const pathname = usePathname();
-    const { data: session } = useSession();
+    const supabase = createClient();
+    const [userRole, setUserRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        const getUserRole = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                setUserRole(data?.role || null);
+            }
+        };
+        getUserRole();
+    }, []);
 
     // ===== MULTI-TENANT: Verificar se é SUPER ADMIN =====
-    const isSuperAdmin = session?.user?.role === "super_admin";
+    const isSuperAdmin = userRole === "super_admin";
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        window.location.href = "/login";
+    };
 
     return (
         <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200">
@@ -116,7 +137,7 @@ export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
             <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100">
                 <ThemeToggleButton />
                 <button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={handleLogout}
                     className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200"
                 >
                     <LogOut className="w-5 h-5" />

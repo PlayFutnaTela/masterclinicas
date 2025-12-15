@@ -1,8 +1,9 @@
-// API Route para métricas e analytics - Simplified Roles
+// API Route para métricas e analytics - Supabase Auth
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/role-middleware";
 import { getMetricsSummary, getMetricsOverTime, getDashboardCards } from "@/lib/metrics";
+import { prisma } from "@/lib/db";
 
 /**
  * GET /api/metricas
@@ -10,17 +11,31 @@ import { getMetricsSummary, getMetricsOverTime, getDashboardCards } from "@/lib/
  */
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver métricas =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
         let organizationId: string;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId") || "";
             if (!organizationId) {
@@ -31,8 +46,6 @@ export async function GET(request: NextRequest) {
             }
         } else {
             // Admin/operador usa organização padrão
-            const { PrismaClient } = await import("@prisma/client");
-            const prisma = new PrismaClient();
             const defaultOrg = await prisma.organization.findFirst({
                 orderBy: { createdAt: "asc" },
                 select: { id: true }
@@ -44,7 +57,6 @@ export async function GET(request: NextRequest) {
                 );
             }
             organizationId = defaultOrg.id;
-            await prisma.$disconnect();
         }
         const { searchParams } = new URL(request.url);
         const period = searchParams.get("period") || "30d"; // 7d, 30d, 90d, 365d
@@ -76,7 +88,7 @@ export async function GET(request: NextRequest) {
         switch (type) {
             case "summary":
                 const summary = await getMetricsSummary(
-                    session.user.id,
+                    user.id,
                     startDate,
                     endDate,
                     organizationId // ===== MULTI-TENANT: Passar organizationId =====
@@ -93,7 +105,7 @@ export async function GET(request: NextRequest) {
                     | "conversion"
                     | undefined;
                 const overtime = await getMetricsOverTime(
-                    session.user.id,
+                    user.id,
                     startDate,
                     endDate,
                     eventType,
@@ -103,7 +115,7 @@ export async function GET(request: NextRequest) {
 
             case "cards":
                 const cards = await getDashboardCards(
-                    session.user.id,
+                    user.id,
                     organizationId // ===== MULTI-TENANT: Passar organizationId =====
                 );
                 return NextResponse.json({ cards });
@@ -112,20 +124,20 @@ export async function GET(request: NextRequest) {
                 // Retornar tudo
                 const [allSummary, allOvertime, allCards] = await Promise.all([
                     getMetricsSummary(
-                        session.user.id,
+                        user.id,
                         startDate,
                         endDate,
                         organizationId // ===== MULTI-TENANT: Passar organizationId =====
                     ),
                     getMetricsOverTime(
-                        session.user.id,
+                        user.id,
                         startDate,
                         endDate,
                         undefined,
                         organizationId // ===== MULTI-TENANT: Passar organizationId =====
                     ),
                     getDashboardCards(
-                        session.user.id,
+                        user.id,
                         organizationId // ===== MULTI-TENANT: Passar organizationId =====
                     ),
                 ]);

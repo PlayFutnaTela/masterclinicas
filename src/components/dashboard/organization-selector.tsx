@@ -1,8 +1,8 @@
-// Seletor de Clínica - Simplified Roles
+// Seletor de Clínica - Supabase Auth
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase";
 import { ChevronDown, Building2 } from "lucide-react";
 import Link from "next/link";
 
@@ -14,14 +14,26 @@ interface Organization {
 }
 
 export function OrganizationSelector() {
-  const { data: session } = useSession();
+  const supabase = createClient();
+  const [user, setUser] = useState<any>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Get user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, [supabase]);
+
   // Buscar organizações acessíveis ao usuário
   useEffect(() => {
+    if (!user) return;
+
     const fetchOrganizations = async () => {
       try {
         const response = await fetch("/api/organizations");
@@ -41,10 +53,10 @@ export function OrganizationSelector() {
       }
     };
 
-    if (session?.user?.id) {
+    if (user?.id) {
       fetchOrganizations();
     }
-  }, [session?.user?.id]);
+  }, [user?.id]);
 
   const selectedOrg = organizations.find((org) => org.id === selectedOrgId);
 
@@ -76,7 +88,7 @@ export function OrganizationSelector() {
                   setIsOpen(false);
                   // Aqui você pode adicionar lógica para trocar de organização
                   // Por enquanto, apenas atualizar o state local
-                  window.location.reload(); // Recarregar para atualizar session
+                  window.location.reload(); // Recarregar para atualizar dados do usuário
                 }}
                 className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                   org.id === selectedOrgId

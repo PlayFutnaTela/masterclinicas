@@ -1,29 +1,33 @@
 // Layout para página de administração
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { SessionProvider } from "next-auth/react";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (!user) {
     redirect("/login");
   }
 
-  // ===== MULTI-TENANT: Proteger acesso apenas para SUPER ADMIN (email específico) =====
-  const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "admin@masterclínicas.com";
-  
-  if (session.user.email !== SUPER_ADMIN_EMAIL) {
+  // Verificar se é super_admin
+  const { data: userData } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!userData || userData.role !== 'super_admin') {
     redirect("/dashboard");
   }
 
   return (
-    <SessionProvider session={session}>
+    <>
       {children}
-    </SessionProvider>
+    </>
   );
 }

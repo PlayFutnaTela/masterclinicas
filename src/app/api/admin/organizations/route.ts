@@ -1,20 +1,26 @@
-// API para SUPER ADMIN gerenciar TODAS as organizações
-import { auth } from "@/lib/auth";
+// API para SUPER ADMIN gerenciar TODAS as organizações - Supabase Auth
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 
 // GET: Listar TODAS as organizações (SUPER ADMIN ONLY)
 export async function GET(request: Request) {
-  const session = await auth();
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (!session?.user?.id) {
+  if (error || !user) {
     return Response.json(
       { error: "Não autenticado" },
       { status: 401 }
     );
   }
 
-  // ===== Verificar se é SUPER ADMIN =====
-  if (session.user.role !== "super_admin") {
+  // Buscar role do usuário no banco
+  const userRecord = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { role: true },
+  });
+
+  if (!userRecord || userRecord.role !== "super_admin") {
     return Response.json(
       { error: "Acesso negado. Apenas super admins podem acessar." },
       { status: 403 }
@@ -48,17 +54,23 @@ export async function GET(request: Request) {
 
 // POST: Criar nova organização (ADMIN ONLY)
 export async function POST(request: Request) {
-  const session = await auth();
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (!session?.user?.id) {
+  if (error || !user) {
     return Response.json(
       { error: "Não autenticado" },
       { status: 401 }
     );
   }
 
-  // ===== Verificar se é SUPER ADMIN =====
-  if (session.user.role !== "super_admin") {
+  // Buscar role do usuário no banco
+  const userRecord = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { role: true },
+  });
+
+  if (!userRecord || userRecord.role !== "super_admin") {
     return Response.json(
       { error: "Acesso negado. Apenas super admins podem criar organizações." },
       { status: 403 }

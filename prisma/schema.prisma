@@ -40,19 +40,18 @@ enum UserRole {
 
 // Usuário (global) com role
 model User {
-  id            String      @id @default(cuid())
+  id            String      @id // Supabase auth UUID
   name          String
   email         String      @unique
-  password      String
   role          UserRole    @default(operador) // ===== SIMPLIFICADO: Role global =====
   organizationId String?     // ===== Para admin/operador: organização associada =====
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   organization  Organization? @relation(fields: [organizationId], references: [id])
-  leads         Lead[]
-  appointments  Appointment[]
-  metricEvents  MetricEvent[]
+  leads         Lead[] @relation("LeadUser")
+  appointments  Appointment[] @relation("AppointmentUser")
+  metricEvents  MetricEvent[] @relation("MetricEventUser")
 
   @@map("users")
 }
@@ -73,7 +72,7 @@ model Lead {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   userId         String
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User       @relation("LeadUser", fields: [userId], references: [id], onDelete: Cascade)
 
   appointments   Appointment[]
 
@@ -105,7 +104,7 @@ model Appointment {
   lead           Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   userId         String
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User       @relation("AppointmentUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("appointments")
   @@index([organizationId])
@@ -131,7 +130,7 @@ model MetricEvent {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   userId         String
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User       @relation("MetricEventUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("metric_events")
   @@index([organizationId])

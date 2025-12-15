@@ -1,10 +1,68 @@
-// Middleware para proteção de rotas do dashboard - Simplified Roles
-import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
+// Middleware para proteção de rotas usando Supabase Auth
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import type { CookieOptions } from '@supabase/ssr';
 
-export default auth((req) => {
-  const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { nextUrl } = request;
+  const isLoggedIn = !!user;
 
   // Rotas protegidas (dashboard)
   const isProtectedRoute =
@@ -32,9 +90,18 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Verificar acesso à rota de admin (super admin only)
-  if (isLoggedIn && isAdminRoute && req.auth?.user?.role !== "super_admin") {
-    return NextResponse.redirect(new URL("/dashboard", nextUrl));
+  // Para rotas de admin, verificar se é super_admin
+  if (isLoggedIn && isAdminRoute) {
+    // Buscar role do usuário no banco
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!userData || userData.role !== 'super_admin') {
+      return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
   }
 
   // Se não está logado e tenta acessar rota de admin, redireciona para login
@@ -44,32 +111,40 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Adicionar role ao header para acesso nas APIs
-  if (isLoggedIn && (isProtectedRoute || isAdminRoute) && req.auth?.user?.role) {
-    const requestHeaders = new Headers(req.headers);
-    requestHeaders.set("X-User-Role", req.auth.user.role);
+  // Adicionar user id e role ao header para acesso nas APIs
+  if (isLoggedIn && (isProtectedRoute || isAdminRoute)) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("X-User-Id", user.id);
 
-    const response = NextResponse.next({
+    // Buscar role
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (userData) {
+      requestHeaders.set("X-User-Role", userData.role);
+    }
+
+    return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
-
-    return response;
   }
 
-  return NextResponse.next();
-});
+  return response;}
 
-// Configuração de quais rotas passam pelo middleware
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/leads/:path*",
-    "/agendamentos/:path*",
-    "/metricas/:path*",
-    "/configuracoes/:path*",
-    "/organizacoes/:path*",
-    "/login",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

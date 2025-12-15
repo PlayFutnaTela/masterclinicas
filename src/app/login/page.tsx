@@ -1,18 +1,19 @@
-// Página de Login e Registro
+// Página de Login e Registro com Supabase Auth
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { createClient } from "@/lib/supabase";
 import Link from "next/link";
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+    const supabase = createClient();
 
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
@@ -30,13 +31,12 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const result = await signIn("credentials", {
+            const { error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
-                redirect: false,
             });
 
-            if (result?.error) {
+            if (error) {
                 setError("Email ou senha incorretos");
             } else {
                 router.push(callbackUrl);
@@ -67,27 +67,41 @@ export default function LoginPage() {
         }
 
         try {
-            const response = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        name: name.trim(),
+                    },
                 },
-                body: JSON.stringify({
-                    name,
-                    email,
-                    password,
-                }),
             });
 
-            const data = await response.json();
+            if (error) {
+                setError(error.message);
+            } else if (data.user) {
+                // Criar perfil na tabela public.user via API (usando service role)
+                const response = await fetch("/api/auth/profile", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        id: data.user.id,
+                        name: name.trim(),
+                        email: email.toLowerCase().trim(),
+                    }),
+                });
 
-            if (response.ok) {
-                setSuccess("Conta criada com sucesso! Você pode fazer login agora.");
-                setIsLogin(true);
-                setPassword("");
-                setConfirmPassword("");
-            } else {
-                setError(data.error || "Erro ao criar conta");
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    setError(errorData.error || "Erro ao salvar perfil. Tente novamente.");
+                } else {
+                    setSuccess("Conta criada com sucesso! Verifique seu email para confirmar a conta.");
+                    setIsLogin(true);
+                    setPassword("");
+                    setConfirmPassword("");
+                }
             }
         } catch {
             setError("Erro ao criar conta. Tente novamente.");
@@ -118,11 +132,10 @@ export default function LoginPage() {
                             setError("");
                             setSuccess("");
                         }}
-                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                            isLogin
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${isLogin
                                 ? "bg-white text-gray-900 shadow-sm"
                                 : "text-gray-500 hover:text-gray-700"
-                        }`}
+                            }`}
                     >
                         Entrar
                     </button>
@@ -132,11 +145,10 @@ export default function LoginPage() {
                             setError("");
                             setSuccess("");
                         }}
-                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                            !isLogin
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${!isLogin
                                 ? "bg-white text-gray-900 shadow-sm"
                                 : "text-gray-500 hover:text-gray-700"
-                        }`}
+                            }`}
                     >
                         Criar Conta
                     </button>

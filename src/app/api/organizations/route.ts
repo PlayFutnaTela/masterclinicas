@@ -1,22 +1,38 @@
-// API para gerenciar organizações - Simplified Roles
-import { auth } from "@/lib/auth";
+// API para gerenciar organizações - Supabase Auth
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 
 // GET: Listar organizações acessíveis ao usuário
 export async function GET(request: Request) {
-  const session = await auth();
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (!session?.user?.id) {
+  if (error || !user) {
     return Response.json(
       { error: "Não autenticado" },
       { status: 401 }
     );
   }
 
+  // Buscar role do usuário no banco
+  const userRecord = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { role: true },
+  });
+
+  if (!userRecord) {
+    return Response.json(
+      { error: "Usuário não encontrado" },
+      { status: 404 }
+    );
+  }
+
+  const userRole = userRecord.role;
+
   try {
     let organizations;
 
-    if (session.user.role === "super_admin") {
+    if (userRole === "super_admin") {
       // Super admin vê todas as organizações
       organizations = await prisma.organization.findMany({
         select: {
@@ -46,7 +62,7 @@ export async function GET(request: Request) {
     return Response.json(
       organizations.map((org) => ({
         ...org,
-        role: session.user.role, // Role global do usuário
+        role: userRole, // Role global do usuário
       }))
     );
   } catch (error) {

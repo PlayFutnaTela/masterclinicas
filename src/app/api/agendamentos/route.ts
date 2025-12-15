@@ -1,6 +1,6 @@
-// API Route para gerenciamento de agendamentos - Simplified Roles
+// API Route para gerenciamento de agendamentos - Supabase Auth
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/role-middleware";
 import { AppointmentStatus } from "@prisma/client";
@@ -11,17 +11,31 @@ import { AppointmentStatus } from "@prisma/client";
  */
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver agendamentos =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Para usuários não super-admin, usar organização padrão
         let organizationId: string | null = null;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             // Super admin pode ver agendamentos de todas as organizações
             // Se não especificar organização, mostrar todas
             const url = new URL(request.url);
@@ -57,7 +71,7 @@ export async function GET(request: NextRequest) {
             status?: AppointmentStatus;
             scheduledAt?: { gte?: Date; lte?: Date };
         } = {
-            userId: session.user.id,
+            userId: user.id,
             organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
         };
 
@@ -115,17 +129,31 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem criar agendamentos =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
         let organizationId: string;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             // Super admin precisa especificar a organização
             const body = await request.json();
             organizationId = body.organizationId;
@@ -164,7 +192,7 @@ export async function POST(request: NextRequest) {
         const lead = await prisma.lead.findFirst({
             where: {
                 id: leadId,
-                userId: session.user.id,
+                userId: user.id,
                 organizationId,
             },
         });
@@ -188,7 +216,7 @@ export async function POST(request: NextRequest) {
                 leadId,
                 scheduledAt: new Date(scheduledAt),
                 notes,
-                userId: session.user.id,
+                userId: user.id,
                 organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
@@ -198,7 +226,7 @@ export async function POST(request: NextRequest) {
             data: {
                 type: "scheduled",
                 metadata: { leadId, appointmentId: appointment.id },
-                userId: session.user.id,
+                userId: user.id,
                 organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
             },
         });
@@ -222,17 +250,31 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
+        // Buscar role do usuário no banco
+        const userRecord = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+
+        if (!userRecord) {
+            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        }
+
+        const userRole = userRecord.role;
+
         // ===== ROLE VALIDATION: Apenas admin e operador podem atualizar agendamentos =====
-        requireRole(session.user.role, "operador");
+        requireRole(userRole, "operador");
 
         // Determinar organização
         let organizationId: string;
-        if (session.user.role === "super_admin") {
+        if (userRole === "super_admin") {
             const body = await request.json();
             organizationId = body.organizationId;
             if (!organizationId) {
@@ -275,7 +317,7 @@ export async function PATCH(request: NextRequest) {
         const appointment = await prisma.appointment.update({
             where: {
                 id,
-                userId: session.user.id,
+                userId: user.id,
                 organizationId,
             },
             data: updateData,
@@ -287,7 +329,7 @@ export async function PATCH(request: NextRequest) {
                 data: {
                     type: "no_show",
                     metadata: { appointmentId: id },
-                    userId: session.user.id,
+                    userId: user.id,
                     organizationId,
                 },
             });

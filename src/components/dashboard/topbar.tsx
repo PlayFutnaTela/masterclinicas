@@ -1,12 +1,22 @@
 // Topbar do Dashboard
 "use client";
 
+import { useEffect, useState } from "react";
 import { Bell, Search } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase";
 import { OrganizationSelector } from "./organization-selector";
 
 export function Topbar() {
-    const { data: session } = useSession();
+    const supabase = createClient();
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+    }, [supabase]);
 
     return (
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
@@ -39,12 +49,12 @@ export function Topbar() {
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-gradient-to-br from-rose-400 to-rose-600 rounded-full flex items-center justify-center">
                         <span className="text-white text-sm font-medium">
-                            {session?.user?.name?.charAt(0).toUpperCase() || "U"}
+                            {user?.user_metadata?.name?.charAt(0).toUpperCase() || "U"}
                         </span>
                     </div>
                     <div className="hidden sm:block">
                         <p className="text-sm font-medium text-gray-900">
-                            {session?.user?.name || "Usuário"}
+                            {user?.user_metadata?.name || "Usuário"}
                         </p>
                         <p className="text-xs text-gray-500">Administrador</p>
                     </div>
