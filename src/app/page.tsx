@@ -83,10 +83,10 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight mb-6">
-            A plataforma completa para gerenciar e expandir sua clínica de estética com inteligência.
+            Mais agendamentos. Menos esforço operacional.
           </h1>
           <p className="text-lg sm:text-xl text-gray-200 mb-10 max-w-2xl mx-auto leading-relaxed opacity-90">
-            MasterClínicas conecta leads, agendamentos, automações e métricas em um só lugar — impulsione sua operação com simplicidade e eficiência.
+            O MasterClínicas transforma contatos em atendimentos confirmados, centralizando leads, agenda e métricas para acelerar o crescimento da sua clínica com eficiência.
           </p>
         </div>
       </header>
@@ -99,8 +99,8 @@ export default function HomePage() {
               <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/People/SVG/ic_fluent_people_48_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Qualificação dos leads</h3>
-              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">MasterClínicas completa para gerenciar e expandir sua operação.</p>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Qualificação de leads</h3>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Tudo o que sua clínica precisa para organizar, qualificar e expandir sua operação com eficiência.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -177,7 +177,7 @@ export default function HomePage() {
                 <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">1</div>
               </div>
               <h3 className="text-2xl font-bold text-[#ee224a] mb-3">1. Conecte sua clínica</h3>
-              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Cadastre sua clínica na plataforma e integre os canais de atendimento. Em poucos minutos, sua operação fica pronta para receber leads, organizar agendamentos e centralizar todas as informações em um único lugar.</p>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Cadastre sua clínica na plataforma e integre os canais de atendimento. Em poquíssimo tempo, sua operação fica pronta para receber leads, organizar agendamentos e centralizar todas as informações em um único lugar.</p>
             </div>
 
             <div className="flex flex-col items-center text-center group">
@@ -205,7 +205,7 @@ export default function HomePage() {
       <section className="py-16 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <h3 className="text-2xl font-bold text-[#ee224a] mb-3">Pronto para transformar a gestão da sua clínica?</h3>
-          <p className="mt-2 text-gray-700">Comece agora, fale com um especialista. Em poucos minutos, você já vê impacto real nos seus agendamentos e no fluxo de atendimento.</p>
+          <p className="mt-2 text-gray-700">Comece agora, fale com um especialista. Em poucquíssimo tempo, você já vê impacto real nos seus agendamentos e no fluxo de atendimento.</p>
           <div className="mt-6">
             <a
               href="https://wa.me/5511994299814?text=Ol%C3%A1%2C%20gostaria%20de%20transformar%20a%20minha%20clinica"
