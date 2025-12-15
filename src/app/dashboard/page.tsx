@@ -4,7 +4,6 @@ import { getDashboardCards, getLeadsByStatus } from "@/lib/metrics";
 import { prisma } from "@/lib/db";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { MetricsChart } from "@/components/charts/metrics-chart";
-import { Users, UserCheck, Calendar, CalendarCheck } from "lucide-react";
 
 async function getDashboardData(userId: string, organizationId: string) {
     const [cards, leadsByStatus, recentLeads] = await Promise.all([
@@ -113,7 +112,7 @@ export default async function DashboardPage() {
                     title="Total de Leads"
                     value={cards.totalLeads}
                     description="Leads recebidos"
-                    icon={Users}
+                    iconSrc="/assets/People/SVG/ic_fluent_people_48_color.svg"
                     color="rose"
                     trend={{ value: 12, isPositive: true }}
                 />
@@ -121,7 +120,7 @@ export default async function DashboardPage() {
                     title="Qualificados"
                     value={cards.qualifiedLeads}
                     description="Leads qualificados"
-                    icon={UserCheck}
+                    iconSrc="/assets/Person/SVG/ic_fluent_person_48_color.svg"
                     color="purple"
                     trend={{ value: 8, isPositive: true }}
                 />
@@ -129,14 +128,14 @@ export default async function DashboardPage() {
                     title="Agendamentos"
                     value={cards.scheduledAppointments}
                     description="Consultas agendadas"
-                    icon={Calendar}
+                    iconSrc="/assets/Calendar/SVG/ic_fluent_calendar_48_color.svg"
                     color="blue"
                 />
                 <StatCard
                     title="Hoje"
                     value={cards.todayAppointments}
                     description="Consultas do dia"
-                    icon={CalendarCheck}
+                    iconSrc="/assets/Calendar/SVG/ic_fluent_calendar_48_color.svg"
                     color="green"
                 />
             </div>

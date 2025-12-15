@@ -44,7 +44,7 @@ export default async function DashboardLayout({
             <Sidebar clinicName={clinicName} />
 
             {/* Main Content */}
-            <div className="ml-64">
+            <div className="ml-52">
                 <Topbar />
                 <main className="p-6">{children}</main>
             </div>

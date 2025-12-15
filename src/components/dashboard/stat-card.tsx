@@ -5,7 +5,8 @@ interface StatCardProps {
     title: string;
     value: string | number;
     description?: string;
-    icon: LucideIcon;
+    icon?: LucideIcon;
+    iconSrc?: string;
     trend?: {
         value: number;
         isPositive: boolean;
@@ -18,6 +19,7 @@ export function StatCard({
     value,
     description,
     icon: Icon,
+    iconSrc,
     trend,
     color = "rose",
 }: StatCardProps) {
@@ -73,7 +75,11 @@ export function StatCard({
                 <div
                     className={`w-12 h-12 ${colorClasses.bg} rounded-xl flex items-center justify-center ring-8 ${colorClasses.ring}`}
                 >
-                    <Icon className={`w-6 h-6 ${colorClasses.icon}`} />
+                    {iconSrc ? (
+                        <img src={iconSrc} alt="" className="w-6 h-6" />
+                    ) : Icon ? (
+                        <Icon className={`w-6 h-6 ${colorClasses.icon}`} />
+                    ) : null}
                 </div>
             </div>
         </div>

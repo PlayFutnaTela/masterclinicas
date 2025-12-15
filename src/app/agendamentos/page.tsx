@@ -1,240 +1,205 @@
-// Página de Agendamentos
-"use client";
+"use client"
 
-import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge, getAppointmentStatusBadge } from "@/components/ui/badge";
-import { Calendar, Clock, User, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { useState, useEffect } from "react"
+import { EventManager, type Event } from "@/components/calendar/event-manager"
 
 interface Appointment {
-    id: string;
-    scheduledAt: string;
-    status: string;
-    notes?: string;
-    lead: {
-        id: string;
-        name: string;
-        phone: string;
-        procedure: string;
-    };
+  id: string
+  scheduledAt: string
+  status: string
+  notes?: string
+  lead: {
+    id: string
+    name: string
+    phone: string
+    procedure: string
+  }
+}
+
+/**
+ * Mapeia status para cores do calendário
+ */
+function getColorByStatus(status: string): string {
+  const colorMap: Record<string, string> = {
+    agendado: "blue",
+    confirmado: "green",
+    realizado: "purple",
+    cancelado: "red",
+    no_show: "orange",
+  }
+  return colorMap[status] || "blue"
+}
+
+/**
+ * Converte agendamento do banco para formato Event
+ */
+function convertAppointmentToEvent(appointment: Appointment): Event {
+  const startTime = new Date(appointment.scheduledAt)
+  const endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // 1 hora por padrão
+
+  return {
+    id: appointment.id,
+    title: `${appointment.lead.name}`,
+    description: appointment.notes || appointment.lead.procedure,
+    startTime,
+    endTime,
+    color: getColorByStatus(appointment.status),
+    category: appointment.lead.procedure || "Consulta",
+    tags: [appointment.status],
+  }
 }
 
 export default function AgendamentosPage() {
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
-    const [isLoading, setIsLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<string>("");
+  const [events, setEvents] = useState<Event[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    const fetchAppointments = useCallback(async (page = 1) => {
-        setIsLoading(true);
-        try {
-            const params = new URLSearchParams({ page: String(page), limit: "10" });
-            if (statusFilter) params.append("status", statusFilter);
+  // Carregar agendamentos do banco de dados
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
 
-            const res = await fetch(`/api/agendamentos?${params}`);
-            const data = await res.json();
+        const response = await fetch("/api/agendamentos", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        })
 
-            setAppointments(data.appointments || []);
-            setPagination(data.pagination || { page: 1, totalPages: 1, total: 0 });
-        } catch (error) {
-            console.error("Erro ao carregar agendamentos:", error);
-        } finally {
-            setIsLoading(false);
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}: ${response.statusText}`)
         }
-    }, [statusFilter]);
 
-    useEffect(() => {
-        fetchAppointments();
-    }, [fetchAppointments]);
+        const data = await response.json()
+        const appointments: Appointment[] = data.appointments || []
 
-    const handleStatusChange = async (id: string, status: string) => {
-        try {
-            await fetch("/api/agendamentos", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id, status }),
-            });
-            fetchAppointments(pagination.page);
-        } catch (error) {
-            console.error("Erro ao atualizar status:", error);
-        }
-    };
+        // Converter agendamentos para eventos
+        const convertedEvents = appointments.map(convertAppointmentToEvent)
+        setEvents(convertedEvents)
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erro desconhecido"
+        console.error("Erro ao carregar agendamentos:", errorMsg)
+        setError(errorMsg)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-    const statusOptions = [
-        { value: "", label: "Todos os status" },
-        { value: "agendado", label: "Agendados" },
-        { value: "confirmado", label: "Confirmados" },
-        { value: "realizado", label: "Realizados" },
-        { value: "cancelado", label: "Cancelados" },
-        { value: "no_show", label: "Não compareceram" },
-    ];
+    loadAppointments()
+  }, [])
 
-    const formatDateTime = (dateStr: string) => {
-        const date = new Date(dateStr);
-        return {
-            date: date.toLocaleDateString("pt-BR"),
-            time: date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        };
-    };
+  const handleEventCreate = async (event: Omit<Event, "id">) => {
+    try {
+      const response = await fetch("/api/agendamentos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt: event.startTime.toISOString(),
+          notes: event.description,
+          status: event.tags?.[0] || "agendado",
+        }),
+      })
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-black">Agendamentos</h1>
-                    <p className="text-gray-700 mt-1">Gerencie suas consultas</p>
-                </div>
-            </div>
+      if (!response.ok) {
+        throw new Error("Erro ao criar agendamento")
+      }
 
-            {/* Filter */}
-            <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-gray-400" />
-                <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2.5 text-sm text-rose-600 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                >
-                    {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
+      // Recarregar lista
+      const reloadResponse = await fetch("/api/agendamentos")
+      const reloadData = await reloadResponse.json()
+      const appointments: Appointment[] = reloadData.appointments || []
+      setEvents(appointments.map(convertAppointmentToEvent))
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido"
+      console.error("Erro ao criar evento:", errorMsg)
+      setError(errorMsg)
+    }
+  }
 
-            {/* Appointments List */}
-            {isLoading ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full mx-auto" />
-                    <p className="mt-4 text-gray-700">Carregando agendamentos...</p>
-                </div>
-            ) : appointments.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                    <Calendar className="w-12 h-12 text-gray-300 mx-auto" />
-                    <p className="mt-4 text-gray-700">Nenhum agendamento encontrado</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {appointments.map((appointment) => {
-                        const { date, time } = formatDateTime(appointment.scheduledAt);
-                        const statusBadge = getAppointmentStatusBadge(appointment.status);
+  const handleEventUpdate = async (id: string, updates: Partial<Event>) => {
+    try {
+      const response = await fetch("/api/agendamentos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          scheduledAt: updates.startTime?.toISOString(),
+          notes: updates.description,
+          status: updates.tags?.[0] || "agendado",
+        }),
+      })
 
-                        return (
-                            <div
-                                key={appointment.id}
-                                className="bg-white rounded-xl border border-gray-200 p-6 hover:border-gray-300 transition-colors"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex gap-6">
-                                        {/* Date/Time */}
-                                        <div className="text-center">
-                                            <div className="w-16 h-16 bg-rose-50 rounded-xl flex flex-col items-center justify-center">
-                                                <Calendar className="w-5 h-5 text-rose-600" />
-                                                <p className="text-xs font-medium text-rose-600 mt-1">{date}</p>
-                                            </div>
-                                            <div className="flex items-center gap-1 mt-2 text-gray-700">
-                                                <Clock className="w-3 h-3" />
-                                                <span className="text-sm">{time}</span>
-                                            </div>
-                                        </div>
+      if (!response.ok) {
+        throw new Error("Erro ao atualizar agendamento")
+      }
 
-                                        {/* Client Info */}
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <User className="w-4 h-4 text-gray-400" />
-                                                <h3 className="font-semibold text-black dark:text-foreground">
-                                                    {appointment.lead.name}
-                                                </h3>
-                                            </div>
-                                            <p className="text-sm text-gray-700 mt-1">
-                                                {appointment.lead.phone}
-                                            </p>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                {appointment.lead.procedure || "Procedimento não especificado"}
-                                            </p>
-                                            {appointment.notes && (
-                                                <p className="text-sm text-gray-600 mt-2 italic">
-                                                    {appointment.notes}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
+      // Recarregar lista
+      const reloadResponse = await fetch("/api/agendamentos")
+      const reloadData = await reloadResponse.json()
+      const appointments: Appointment[] = reloadData.appointments || []
+      setEvents(appointments.map(convertAppointmentToEvent))
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido"
+      console.error("Erro ao atualizar evento:", errorMsg)
+      setError(errorMsg)
+    }
+  }
 
-                                    {/* Status & Actions */}
-                                    <div className="text-right">
-                                        <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
-                                        <div className="mt-4 flex gap-2">
-                                            {appointment.status === "agendado" && (
-                                                <>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        onClick={() => handleStatusChange(appointment.id, "confirmado")}
-                                                    >
-                                                        Confirmar
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => handleStatusChange(appointment.id, "cancelado")}
-                                                    >
-                                                        Cancelar
-                                                    </Button>
-                                                </>
-                                            )}
-                                            {appointment.status === "confirmado" && (
-                                                <>
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => handleStatusChange(appointment.id, "realizado")}
-                                                    >
-                                                        Realizado
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="danger"
-                                                        onClick={() => handleStatusChange(appointment.id, "no_show")}
-                                                    >
-                                                        Não veio
-                                                    </Button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+  const handleEventDelete = async (id: string) => {
+    try {
+      const response = await fetch("/api/agendamentos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
 
-                    {/* Pagination */}
-                    {pagination.totalPages > 1 && (
-                        <div className="flex items-center justify-between pt-4">
-                            <p className="text-sm text-gray-700">
-                                Página {pagination.page} de {pagination.totalPages}
-                            </p>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => fetchAppointments(pagination.page - 1)}
-                                    disabled={pagination.page === 1}
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => fetchAppointments(pagination.page + 1)}
-                                    disabled={pagination.page === pagination.totalPages}
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+      if (!response.ok) {
+        throw new Error("Erro ao deletar agendamento")
+      }
+
+      // Recarregar lista
+      const reloadResponse = await fetch("/api/agendamentos")
+      const reloadData = await reloadResponse.json()
+      const appointments: Appointment[] = reloadData.appointments || []
+      setEvents(appointments.map(convertAppointmentToEvent))
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido"
+      console.error("Erro ao deletar evento:", errorMsg)
+      setError(errorMsg)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-white p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-black mb-2">Agendamentos</h1>
+          <p className="text-gray-600">
+            Gerencie os compromissos e agendamentos da sua clínica
+          </p>
         </div>
-    );
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+            <p className="text-red-300">
+              <strong>Erro:</strong> {error}
+            </p>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="text-gray-600">Carregando agendamentos...</div>
+          </div>
+        ) : (
+          <EventManager
+            events={events}
+            onEventCreate={handleEventCreate}
+            onEventUpdate={handleEventUpdate}
+            onEventDelete={handleEventDelete}
+          />
+        )}
+      </div>
+    </div>
+  )
 }

@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { MetricsChart } from "@/components/charts/metrics-chart";
 import { BarChartCard } from "@/components/charts/bar-chart";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { TrendingUp, Users, Calendar, Target } from "lucide-react";
 
 interface MetricsSummary {
     leadsReceived: number;
@@ -109,7 +108,7 @@ export default function MetricasPage() {
                     <StatCard
                         title="Leads Recebidos"
                         value={summary?.leadsReceived || 0}
-                        icon={Users}
+                        iconSrc="/assets/People/SVG/ic_fluent_people_48_color.svg"
                         color="rose"
                     />
                     <StatCard
@@ -117,19 +116,19 @@ export default function MetricasPage() {
                         value={summary?.leadsReceived
                             ? `${Math.round((summary.qualified / summary.leadsReceived) * 100)}%`
                             : "0%"}
-                        icon={Target}
+                        iconSrc="/assets/Data Bar Vertical Ascending/SVG/ic_fluent_data_bar_vertical_ascending_24_color.svg"
                         color="purple"
                     />
                     <StatCard
                         title="Agendamentos"
                         value={summary?.scheduled || 0}
-                        icon={Calendar}
+                        iconSrc="/assets/Calendar/SVG/ic_fluent_calendar_48_color.svg"
                         color="blue"
                     />
                     <StatCard
                         title="Conversões"
                         value={summary?.conversions || 0}
-                        icon={TrendingUp}
+                        iconSrc="/assets/Chat/SVG/ic_fluent_chat_48_color.svg"
                         color="green"
                     />
                 </div>
