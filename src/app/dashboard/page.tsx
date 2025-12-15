@@ -6,12 +6,12 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { MetricsChart } from "@/components/charts/metrics-chart";
 import { Users, UserCheck, Calendar, CalendarCheck } from "lucide-react";
 
-async function getDashboardData(userId: string) {
+async function getDashboardData(userId: string, organizationId: string) {
     const [cards, leadsByStatus, recentLeads] = await Promise.all([
-        getDashboardCards(userId),
-        getLeadsByStatus(userId),
+        getDashboardCards(userId, organizationId),
+        getLeadsByStatus(userId, organizationId),
         prisma.lead.findMany({
-            where: { userId },
+            where: { userId, organizationId },
             orderBy: { createdAt: "desc" },
             take: 5,
         }),
@@ -69,7 +69,25 @@ export default async function DashboardPage() {
         return null;
     }
 
-    const { cards, chartData } = await getDashboardData(session.user.id);
+    // Determinar organização
+    let organizationId: string;
+    if (session.user.role === "super_admin") {
+        // Super admin vê dados de todas as organizações (usar primeira como padrão)
+        const org = await prisma.organization.findFirst({
+            orderBy: { createdAt: "asc" },
+            select: { id: true }
+        });
+        organizationId = org?.id || "";
+    } else {
+        // Admin/operador usa organização padrão
+        const org = await prisma.organization.findFirst({
+            orderBy: { createdAt: "asc" },
+            select: { id: true }
+        });
+        organizationId = org?.id || "";
+    }
+
+    const { cards, chartData } = await getDashboardData(session.user.id, organizationId);
 
     return (
         <div className="space-y-6">

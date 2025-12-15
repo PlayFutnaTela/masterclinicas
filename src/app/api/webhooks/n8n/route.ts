@@ -1,8 +1,7 @@
-// Webhook endpoint para receber dados do n8n - Multi-Tenant
+// Webhook endpoint para receber dados do n8n - Simplified Roles
 // Eventos: novo lead, lead qualificado, agendamento, métricas
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { validateUserOrganization } from "@/lib/org-middleware";
 
 // Tipos de eventos aceitos
 type WebhookEventType =
@@ -13,8 +12,7 @@ type WebhookEventType =
 
 interface WebhookPayload {
     type: WebhookEventType;
-    apiKey: string;
-    organizationId: string; // ===== MULTI-TENANT: Adicionar organizationId ao payload =====
+    organizationId: string;
     data: Record<string, unknown>;
 }
 
@@ -27,37 +25,48 @@ export async function POST(request: NextRequest) {
         const body: WebhookPayload = await request.json();
 
         // Validar payload
-        if (!body.type || !body.apiKey) {
+        if (!body.type) {
             return NextResponse.json(
-                { error: "Tipo de evento e apiKey são obrigatórios" },
+                { error: "Tipo de evento é obrigatório" },
                 { status: 400 }
             );
         }
 
-        // ===== MULTI-TENANT: Validar organizationId no payload =====
+        // Validar organizationId no payload
         if (!body.organizationId) {
             return NextResponse.json(
                 { error: "organizationId é obrigatório" },
                 { status: 400 }
             );
         }
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
 
-        // Validar API key e obter usuário
-        const user = await prisma.user.findUnique({
-            where: { apiKey: body.apiKey },
+        // Verificar se a organização existe
+        const organization = await prisma.organization.findUnique({
+            where: { id: body.organizationId },
+        });
+
+        if (!organization) {
+            return NextResponse.json(
+                { error: "Organização não encontrada" },
+                { status: 404 }
+            );
+        }
+
+        // Para webhooks, usar o primeiro usuário admin da organização
+        // TODO: Melhorar isso no futuro com API keys específicas
+        const user = await prisma.user.findFirst({
+            where: {
+                role: { in: ["admin", "super_admin"] }
+            },
+            orderBy: { createdAt: "asc" }
         });
 
         if (!user) {
             return NextResponse.json(
-                { error: "API key inválida" },
-                { status: 401 }
+                { error: "Nenhum usuário administrador encontrado" },
+                { status: 500 }
             );
         }
-
-        // ===== MULTI-TENANT: Validar que o usuário pertence à organização =====
-        await validateUserOrganization(user.id, body.organizationId);
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
 
         // Processar evento por tipo
         switch (body.type) {
@@ -208,9 +217,9 @@ export async function POST(request: NextRequest) {
                 await prisma.metricEvent.create({
                     data: {
                         type: eventType as "lead_received" | "qualified" | "scheduled" | "no_show" | "follow_up" | "conversion",
-                        metadata: metadata || {},
+                        metadata: (metadata || {}) as any,
                         userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
+                        organizationId: body.organizationId,
                     },
                 });
 

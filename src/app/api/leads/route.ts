@@ -1,8 +1,8 @@
-// API Route para gerenciamento de leads - Multi-Tenant
+// API Route para gerenciamento de leads - Simplified Roles
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { validateUserOrganization } from "@/lib/org-middleware";
+import { requireRole } from "@/lib/role-middleware";
 import { LeadStatus } from "@prisma/client";
 
 /**
@@ -16,17 +16,30 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // ===== MULTI-TENANT: Validar organização do usuário =====
-        const organizationId = session.user.organizationId;
+        // ===== ROLE VALIDATION: Apenas admin e operador podem ver leads =====
+        requireRole(session.user.role, "operador");
+
+        // Determinar organização
+        let organizationId: string | null = null;
+        if (session.user.role === "super_admin") {
+            // Super admin pode ver leads de todas as organizações
+            const url = new URL(request.url);
+            organizationId = url.searchParams.get("organizationId");
+        } else {
+            // Admin/operador vê apenas da organização padrão
+            const defaultOrg = await prisma.organization.findFirst({
+                orderBy: { createdAt: "asc" },
+                select: { id: true }
+            });
+            organizationId = defaultOrg?.id || null;
+        }
+
         if (!organizationId) {
             return NextResponse.json(
-                { error: "Organização não encontrada na sessão" },
+                { error: "Organização não encontrada" },
                 { status: 400 }
             );
         }
-
-        await validateUserOrganization(session.user.id, organizationId);
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
 
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get("page") || "1");
@@ -102,17 +115,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // ===== MULTI-TENANT: Validar organização do usuário =====
-        const organizationId = session.user.organizationId;
-        if (!organizationId) {
-            return NextResponse.json(
-                { error: "Organização não encontrada na sessão" },
-                { status: 400 }
-            );
-        }
+        // ===== ROLE VALIDATION: Apenas admin e operador podem criar leads =====
+        requireRole(session.user.role, "operador");
 
-        await validateUserOrganization(session.user.id, organizationId);
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
+        // Determinar organização
+        let organizationId: string;
+        if (session.user.role === "super_admin") {
+            const body = await request.json();
+            organizationId = body.organizationId;
+            if (!organizationId) {
+                return NextResponse.json(
+                    { error: "Super admin deve especificar organizationId" },
+                    { status: 400 }
+                );
+            }
+        } else {
+            const defaultOrg = await prisma.organization.findFirst({
+                orderBy: { createdAt: "asc" },
+                select: { id: true }
+            });
+            if (!defaultOrg) {
+                return NextResponse.json(
+                    { error: "Nenhuma organização encontrada" },
+                    { status: 400 }
+                );
+            }
+            organizationId = defaultOrg.id;
+        }
 
         const body = await request.json();
         const { name, phone, procedure, source, notes } = body;
@@ -167,17 +196,39 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // ===== MULTI-TENANT: Validar organização do usuário =====
-        const organizationId = session.user.organizationId;
+        // ===== ROLE VALIDATION: Apenas admin e operador podem atualizar leads =====
+        requireRole(session.user.role, "operador");
+
+        // Determinar organização
+        let organizationId: string;
+        if (session.user.role === "super_admin") {
+            const body = await request.json();
+            organizationId = body.organizationId;
+            if (!organizationId) {
+                return NextResponse.json(
+                    { error: "Super admin deve especificar organizationId" },
+                    { status: 400 }
+                );
+            }
+        } else {
+            const defaultOrg = await prisma.organization.findFirst({
+                orderBy: { createdAt: "asc" },
+                select: { id: true }
+            });
+            if (!defaultOrg) {
+                return NextResponse.json(
+                    { error: "Nenhuma organização encontrada" },
+                    { status: 400 }
+                );
+            }
+            organizationId = defaultOrg.id;
+        }
         if (!organizationId) {
             return NextResponse.json(
-                { error: "Organização não encontrada na sessão" },
+                { error: "Organização não encontrada" },
                 { status: 400 }
             );
         }
-
-        await validateUserOrganization(session.user.id, organizationId);
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
 
         const body = await request.json();
         const { id, status, notes } = body;

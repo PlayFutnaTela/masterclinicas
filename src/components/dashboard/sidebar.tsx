@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
     LayoutDashboard,
     Users,
@@ -11,6 +12,7 @@ import {
     Settings,
     LogOut,
     Sparkles,
+    Building2,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { ThemeToggleButton } from "./theme-toggle-button";
@@ -47,6 +49,12 @@ const navItems: NavItem[] = [
         href: "/configuracoes",
         icon: <Settings className="w-5 h-5" />,
     },
+    // ===== MULTI-TENANT: Menu de Clínicas =====
+    {
+        label: "Minhas Clínicas",
+        href: "/organizacoes",
+        icon: <Building2 className="w-5 h-5" />,
+    },
 ];
 
 interface SidebarProps {
@@ -55,6 +63,11 @@ interface SidebarProps {
 
 export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
     const pathname = usePathname();
+    const { data: session } = useSession();
+
+    // ===== MULTI-TENANT: Verificar se é SUPER ADMIN =====
+    const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "admin@masterclínicas.com";
+    const isSuperAdmin = session?.user?.email === SUPER_ADMIN_EMAIL;
 
     return (
         <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200">
@@ -72,6 +85,11 @@ export function Sidebar({ clinicName = "Clínica" }: SidebarProps) {
             {/* Navegação */}
             <nav className="px-3 py-4 space-y-1">
                 {navItems.map((item) => {
+                    // ===== MULTI-TENANT: Mostrar menu de clínicas apenas para SUPER ADMIN =====
+                    if (item.href === "/organizacoes" && !isSuperAdmin) {
+                        return null;
+                    }
+
                     const isActive = pathname === item.href ||
                         (item.href !== "/dashboard" && pathname.startsWith(item.href));
 

@@ -20,7 +20,7 @@ model Organization {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  users        UserOrganization[]
+  users        User[]
   leads        Lead[]
   appointments Appointment[]
   metricEvents MetricEvent[]
@@ -29,41 +29,27 @@ model Organization {
   @@index([slug])
 }
 
-// Associação User <-> Organization (com roles)
-model UserOrganization {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  role           UserRole @default(operador)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@unique([userId, organizationId])
-  @@map("user_organizations")
-  @@index([userId])
-  @@index([organizationId])
-}
+// ===== SIMPLIFICADO: Removida tabela UserOrganization =====
+// ===== Agora role fica diretamente na tabela User =====
 
 enum UserRole {
+  super_admin
   admin
-  gerente
   operador
 }
 
-// Usuário (global)
+// Usuário (global) com role
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String      @id @default(cuid())
+  name          String
+  email         String      @unique
+  password      String
+  role          UserRole    @default(operador) // ===== SIMPLIFICADO: Role global =====
+  organizationId String?     // ===== Para admin/operador: organização associada =====
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  organizations UserOrganization[]
+  organization  Organization? @relation(fields: [organizationId], references: [id])
   leads         Lead[]
   appointments  Appointment[]
   metricEvents  MetricEvent[]

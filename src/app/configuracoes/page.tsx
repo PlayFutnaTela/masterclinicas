@@ -24,7 +24,7 @@ export default function ConfiguracoesPage() {
         // Carregar configurações do usuário
         if (session?.user) {
             setSettings({
-                clinicName: session.user.clinicName || "",
+                clinicName: "",
                 whatsappLink: "",
                 webhookUrl: "",
                 apiKey: "",

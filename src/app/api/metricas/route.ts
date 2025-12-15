@@ -1,7 +1,7 @@
-// API Route para métricas e analytics - Multi-Tenant
+// API Route para métricas e analytics - Simplified Roles
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { validateUserOrganization } from "@/lib/org-middleware";
+import { requireRole } from "@/lib/role-middleware";
 import { getMetricsSummary, getMetricsOverTime, getDashboardCards } from "@/lib/metrics";
 
 /**
@@ -15,18 +15,37 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // ===== MULTI-TENANT: Validar organização do usuário =====
-        const organizationId = session.user.organizationId;
-        if (!organizationId) {
-            return NextResponse.json(
-                { error: "Organização não encontrada na sessão" },
-                { status: 400 }
-            );
+        // ===== ROLE VALIDATION: Apenas admin e operador podem ver métricas =====
+        requireRole(session.user.role, "operador");
+
+        // Determinar organização
+        let organizationId: string;
+        if (session.user.role === "super_admin") {
+            const url = new URL(request.url);
+            organizationId = url.searchParams.get("organizationId") || "";
+            if (!organizationId) {
+                return NextResponse.json(
+                    { error: "Super admin deve especificar organizationId" },
+                    { status: 400 }
+                );
+            }
+        } else {
+            // Admin/operador usa organização padrão
+            const { PrismaClient } = await import("@prisma/client");
+            const prisma = new PrismaClient();
+            const defaultOrg = await prisma.organization.findFirst({
+                orderBy: { createdAt: "asc" },
+                select: { id: true }
+            });
+            if (!defaultOrg) {
+                return NextResponse.json(
+                    { error: "Nenhuma organização encontrada" },
+                    { status: 400 }
+                );
+            }
+            organizationId = defaultOrg.id;
+            await prisma.$disconnect();
         }
-
-        await validateUserOrganization(session.user.id, organizationId);
-        // ===== FIM VALIDAÇÃO MULTI-TENANT =====
-
         const { searchParams } = new URL(request.url);
         const period = searchParams.get("period") || "30d"; // 7d, 30d, 90d, 365d
         const type = searchParams.get("type"); // summary, overtime, cards

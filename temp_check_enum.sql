@@ -1,0 +1,1 @@
+SELECT enumtypid::regtype AS enum_type, enumlabel FROM pg_enum ORDER BY enumtypid, enumsortorder;

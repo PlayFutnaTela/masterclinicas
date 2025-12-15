@@ -1,4 +1,4 @@
-// Auth.js (NextAuth v5) Configuration - Multi-Tenant
+// Auth.js (NextAuth v5) Configuration - Simplified Roles
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
@@ -19,13 +19,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
-          include: {
-            organizations: {
-              include: { organization: true },
-              orderBy: { createdAt: "desc" },
-              take: 1,
-            },
-          },
         });
 
         if (!user) {
@@ -41,19 +34,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Senha incorreta");
         }
 
-        // Verificar se usuário tem organização
-        if (!user.organizations || user.organizations.length === 0) {
-          throw new Error("Usuário sem organização associada");
-        }
-
-        const userOrg = user.organizations[0];
-
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          organizationId: userOrg.organizationId,
-          userRole: userOrg.role,
+          role: user.role,
         };
       },
     }),
@@ -62,16 +47,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.organizationId = user.organizationId;
-        token.userRole = user.userRole;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.organizationId = token.organizationId as string;
-        session.user.userRole = token.userRole as any;
+        session.user.role = token.role as any;
       }
       return session;
     },

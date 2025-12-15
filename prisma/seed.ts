@@ -1,13 +1,29 @@
-// Seed do banco de dados com dados de exemplo - Multi-Tenant
+// Seed do banco de dados com dados de exemplo - Simplified Roles
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Iniciando seed multi-tenant...");
+  console.log("🌱 Iniciando seed com roles simplificados...");
 
-  // ===== MULTI-TENANT: Criar organização =====
+  // ===== Criar SUPER ADMIN (proprietário da plataforma) =====
+  const superAdminHashedPassword = await hash("123456", 12);
+
+  const superAdminUser = await prisma.user.upsert({
+    where: { email: "admin@masterclínicas.com" },
+    update: {},
+    create: {
+      email: "admin@masterclínicas.com",
+      password: superAdminHashedPassword,
+      name: "Super Admin",
+      role: "super_admin",
+    },
+  });
+
+  console.log("✅ SUPER ADMIN criado:", superAdminUser.email);
+
+  // ===== Criar organização =====
   const org = await prisma.organization.upsert({
     where: { slug: "clinica-beleza" },
     update: {},
@@ -21,7 +37,7 @@ async function main() {
 
   console.log("✅ Organização criada:", org.name);
 
-  // ===== MULTI-TENANT: Criar usuário admin =====
+  // ===== Criar usuário admin da clínica =====
   const adminHashedPassword = await hash("123456", 12);
 
   const adminUser = await prisma.user.upsert({
@@ -30,31 +46,14 @@ async function main() {
     create: {
       email: "admin@clinica.com",
       password: adminHashedPassword,
-      name: "Administrador",
+      name: "Administrador da Clínica",
+      role: "admin",
     },
   });
 
   console.log("✅ Usuário admin criado:", adminUser.email);
 
-  // ===== MULTI-TENANT: Vincular usuário admin à organização com role =====
-  await prisma.userOrganization.upsert({
-    where: {
-      userId_organizationId: {
-        userId: adminUser.id,
-        organizationId: org.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: adminUser.id,
-      organizationId: org.id,
-      role: "admin",
-    },
-  });
-
-  console.log("✅ Usuário admin vinculado à organização como ADMIN");
-
-  // ===== MULTI-TENANT: Criar usuário de teste =====
+  // ===== Criar usuário de teste =====
   const testHashedPassword = await hash("#Natalia2017", 12);
 
   const testUser = await prisma.user.upsert({
@@ -64,30 +63,13 @@ async function main() {
       email: "exemplo@exemplo.com",
       password: testHashedPassword,
       name: "Usuário de Teste",
+      role: "operador",
     },
   });
 
   console.log("✅ Usuário de teste criado:", testUser.email);
 
-  // ===== MULTI-TENANT: Vincular usuário de teste à organização com role =====
-  await prisma.userOrganization.upsert({
-    where: {
-      userId_organizationId: {
-        userId: testUser.id,
-        organizationId: org.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: testUser.id,
-      organizationId: org.id,
-      role: "operador",
-    },
-  });
-
-  console.log("✅ Usuário de teste vinculado à organização como OPERADOR");
-
-  // ===== MULTI-TENANT: Criar leads de exemplo com organizationId =====
+  // ===== Criar leads de exemplo com organizationId =====
   const leadData = [
     { name: "Maria Silva", phone: "11999990001", procedure: "Botox", status: "qualificado" as const, source: "Instagram" },
     { name: "Ana Paula", phone: "11999990002", procedure: "Preenchimento Labial", status: "novo" as const, source: "Google" },
@@ -166,11 +148,18 @@ async function main() {
   console.log("✅ Eventos de métrica criados:", metricTypes.length);
 
   console.log("\n🎉 Seed multi-tenant concluído!");
-  console.log("\n📧 Acesso Admin:");
+  
+  console.log("\n🔐 SUPER ADMIN (Proprietário da Plataforma):");
+  console.log("   Email: admin@masterclínicas.com");
+  console.log("   Senha: 123456");
+  console.log("   Acesso: /organizacoes (gerenciar todas as clínicas)");
+  
+  console.log("\n📧 ADMIN DA CLÍNICA (Gerencia apenas Clínica Beleza):");
   console.log("   Email: admin@clinica.com");
   console.log("   Senha: 123456");
   console.log("   Role: admin");
-  console.log("\n📧 Acesso Teste:");
+  
+  console.log("\n📧 OPERADOR DA CLÍNICA (Acesso limitado):");
   console.log("   Email: exemplo@exemplo.com");
   console.log("   Senha: #Natalia2017");
   console.log("   Role: operador");

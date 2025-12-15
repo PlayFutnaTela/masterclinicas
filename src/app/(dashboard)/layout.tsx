@@ -1,4 +1,4 @@
-// Layout do Dashboard
+// Layout do Dashboard - Simplified Roles
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { SessionProvider } from "next-auth/react";
@@ -13,17 +13,20 @@ export default async function DashboardLayout({
 }) {
     const session = await auth();
 
-    if (!session || !session.user.organizationId) {
+    if (!session) {
         redirect("/login");
     }
 
-    // ===== MULTI-TENANT: Buscar nome da organização =====
-    const organization = await db.organization.findUnique({
-        where: { id: session.user.organizationId },
-        select: { name: true },
-    });
-
-    const clinicName = organization?.name || "Minha Clínica";
+    // Determinar organização para exibir no layout
+    let clinicName = "MasterClínicas";
+    if (session.user.role !== "super_admin") {
+        // Para usuários normais, buscar organização padrão
+        const organization = await db.organization.findFirst({
+            orderBy: { createdAt: "asc" },
+            select: { name: true },
+        });
+        clinicName = organization?.name || "Minha Clínica";
+    }
 
     return (
         <SessionProvider session={session}>
