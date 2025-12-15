@@ -52,7 +52,7 @@ CardContent.displayName = "CardContent";
 // Card Title
 const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
     ({ className = "", children, ...props }, ref) => (
-        <h3 ref={ref} className={`text-lg font-semibold text-foreground ${className}`} {...props}>
+        <h3 ref={ref} className={`text-lg font-semibold text-black dark:text-foreground ${className}`} {...props}>
             {children}
         </h3>
     )

@@ -88,7 +88,7 @@ export default function LeadsPage() {
                         Gerencie seus potenciais clientes
                     </p>
                 </div>
-                <Button>
+                <Button variant="secondary" className="text-rose-600">
                     <Plus className="w-4 h-4 mr-2" />
                     Novo Lead
                 </Button>
@@ -112,7 +112,7 @@ export default function LeadsPage() {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        className="px-4 py-2.5 text-sm text-rose-600 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
                     >
                         {statusOptions.map((option) => (
                             <option key={option.value} value={option.value}>

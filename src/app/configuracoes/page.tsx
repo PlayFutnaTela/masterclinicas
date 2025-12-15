@@ -81,15 +81,15 @@ export default function ConfiguracoesPage() {
         <div className="space-y-6 max-w-3xl">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-                <p className="text-gray-500 mt-1">Gerencie as configurações da sua clínica</p>
+                <h1 className="text-2xl font-bold text-black">Configurações</h1>
+                <p className="text-gray-700 mt-1">Gerencie as configurações da sua clínica</p>
             </div>
 
             {/* Clinic Info */}
             <Card variant="bordered">
                 <CardHeader>
                     <CardTitle>Informações da Clínica</CardTitle>
-                    <CardDescription>Dados exibidos na página pública</CardDescription>
+                    <CardDescription className="text-gray-700">Dados exibidos na página pública</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Input
@@ -112,7 +112,7 @@ export default function ConfiguracoesPage() {
             <Card variant="bordered">
                 <CardHeader>
                     <CardTitle>Integração n8n</CardTitle>
-                    <CardDescription>Configure a comunicação com suas automações</CardDescription>
+                    <CardDescription className="text-gray-700">Configure a comunicação com suas automações</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Webhook URL (para n8n chamar) */}
@@ -133,7 +133,7 @@ export default function ConfiguracoesPage() {
                                 {copied === "webhook" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                             </Button>
                         </div>
-                        <p className="mt-1.5 text-sm text-gray-500">
+                        <p className="mt-1.5 text-sm text-gray-700">
                             Configure este endpoint no seu fluxo n8n para enviar leads
                         </p>
                     </div>
@@ -160,7 +160,7 @@ export default function ConfiguracoesPage() {
                                 <RefreshCw className="w-4 h-4" />
                             </Button>
                         </div>
-                        <p className="mt-1.5 text-sm text-gray-500">
+                        <p className="mt-1.5 text-sm text-gray-700">
                             Inclua esta chave no campo apiKey ao chamar o webhook
                         </p>
                     </div>
@@ -180,7 +180,7 @@ export default function ConfiguracoesPage() {
             <Card variant="bordered">
                 <CardHeader>
                     <CardTitle>Documentação da API</CardTitle>
-                    <CardDescription>Como usar o webhook para enviar leads</CardDescription>
+                    <CardDescription className="text-gray-700">Como usar o webhook para enviar leads</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
