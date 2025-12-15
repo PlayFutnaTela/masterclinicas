@@ -1,7 +1,6 @@
 // Página principal da PLATAFORMA MasterClínicas
 import Link from "next/link";
 import {
-  Sparkles,
   Phone,
   MapPin,
   Clock
@@ -48,10 +47,10 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+                <img src="/logo2-masterclinicas.png" alt="MasterClínicas" className="w-full h-full object-contain" />
               </div>
-              <span className="font-bold text-black">MasterClínicas</span>
+              <span className="font-bold text-[#ee224a]">MasterClínicas</span>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black">
@@ -92,69 +91,69 @@ export default function HomePage() {
 
       {/* Feature cards (grid like provided) */}
       <section className="relative z-20 -mt-32 px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="max-w-7xl mx-auto bg-white dark:bg-surface-dark rounded-3xl shadow-soft p-6 md:p-10 border border-gray-100 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto bg-white dark:bg-surface-dark rounded-3xl shadow-soft p-6 md:p-10 border" style={{ borderColor: 'var(--primary-dark)' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-rose-100 dark:bg-[rgba(194,69,100,0.14)]">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/People/SVG/ic_fluent_people_48_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Qualificação dos leads</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Qualificação dos leads</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">MasterClínicas completa para gerenciar e expandir sua operação.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-teal-100 dark:bg-teal-900/30">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Calendar/SVG/ic_fluent_calendar_48_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Agendamentos e automações</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Agendamentos e automações</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Conecte agendamentos, lembretes e confirmações automáticas.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-amber-100 dark:bg-amber-900/30">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Gauge/SVG/ic_fluent_gauge_32_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Automações e métricas</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Automações e métricas</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Integre dados e painéis para medir a performance real da clínica.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-rose-100 dark:bg-[rgba(194,69,100,0.14)]">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Checkbox/SVG/ic_fluent_checkbox_24_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Confirmações personalizadas</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Confirmações personalizadas</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Comunicações customizadas para diminuir faltas e aumentar conversões.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-cyan-100 dark:bg-cyan-900/30">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Code/SVG/ic_fluent_code_24_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Orquestração de fluxos</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Orquestração de fluxos</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Gerencie triggers, webhooks e integrações em um só painel.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-orange-100 dark:bg-orange-900/30">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Shifts/SVG/ic_fluent_shifts_32_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Sincronizações</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Sincronizações</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Conecte seus sistemas e mantenha dados consistentes em tempo real.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center" style={{ backgroundColor: 'rgba(194,69,100,0.08)' }}>
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Link/SVG/ic_fluent_link_32_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Percursos e jornadas</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Percursos e jornadas</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Defina fluxos e jornadas dos seus pacientes desde o primeiro contato.</p>
             </div>
 
             <div className="group p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-stone-100 dark:bg-stone-700">
+              <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:-translate-y-1 transition-all" style={{ backgroundColor: 'rgba(194,69,100,0.12)' }}>
                 <img src="/assets/Receipt/SVG/ic_fluent_receipt_32_color.svg" alt="" className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-black mb-2">Faturamento e pagamentos</h3>
+              <h3 className="text-lg font-bold text-[#ee224a] mb-2">Faturamento e pagamentos</h3>
               <p className="text-sm text-gray-800 dark:text-gray-400 leading-relaxed">Controle cobranças, pacotes e relatórios financeiros com facilidade.</p>
             </div>
           </div>
@@ -165,36 +164,36 @@ export default function HomePage() {
       <section className="py-24 bg-[#FAF7F2] dark:bg-surface-dark transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-black mb-4">Como funciona</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#ee224a] mb-4">Como funciona</h2>
             <div className="w-16 h-1 bg-[var(--primary)] mx-auto rounded-full"></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-16">
             <div className="flex flex-col items-center text-center group">
-              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border border-gray-100 dark:border-gray-700">
+              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
                 <img alt="Conexão Grátis" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4zfWrkEQLd9EuUoI1ORuMOXTwyKdK5z1yaYTIt6ibrVq0PfItOka2-iMWQN5AvgNGjxqRGs15-DND6o9aleHtydiCpVCI3smCo4tRHAK-fPJ5y1er2nhiyeL4vABXPJx_Uc63Aq-ihMR9N6guUo_ZPgEMZpUrxhC1rzsPdX_k72m540SJRE_Bp-tGlOHBfFIqjm6Ba2RL-zJ56i0ykiBXdqC1AiRjQROG1YXNw4NoNdwwJ0vY0GsyZQ5azheDkKkf9-d7I9uTu8w"/>
-                <div className="absolute bottom-4 right-4 bg-[var(--primary)] text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">1</div>
+                <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">1</div>
               </div>
-              <h3 className="text-2xl font-bold text-black mb-3">1. Conecta grátis</h3>
-              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">MasterClínicas conecta leads, agendamentos, automações e métricas em um só lugar — agendamento e no seu lugar.</p>
+              <h3 className="text-2xl font-bold text-[#ee224a] mb-3">1. Conecte sua clínica</h3>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Cadastre sua clínica na plataforma e integre os canais de atendimento. Em poucos minutos, sua operação fica pronta para receber leads, organizar agendamentos e centralizar todas as informações em um único lugar.</p>
             </div>
 
             <div className="flex flex-col items-center text-center group">
-              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border border-gray-100 dark:border-gray-700">
+              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
                 <img alt="Definir Agendamento" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASpBK3xXfKfhwbsXrEObdW7y6-ojZs_bnpM-bk5WgNLddkwHxoG2stUDmFddnR5wrRVNcbdSiqaK1jFINroD66X8zwWw_AvovkIo2xxv9Y6XG2EO0wF-Bt1AE4RrSgl6SRx1R75g8cldPVecGkZoxlxkxPC3C1TJFdI9zdMZUw4EWrBqA3YhYnS0nqIHS8iSieqGqWgLeGeaywLUQHlSuDIHiKhjfI5BvJNVKRrjGbVK09RkCvdbBnY6UzMzJmxGnT4pr1Tt-ymI8"/>
-                <div className="absolute bottom-4 right-4 bg-[var(--primary)] text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">2</div>
+                <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">2</div>
               </div>
-              <h3 className="text-2xl font-bold text-black mb-3">2. Definir agendamento</h3>
-              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">MasterClínicas entrega configuração, move e organiza suas métricas. Ponto e contatos e automações agora em só lugar.</p>
+              <h3 className="text-2xl font-bold text-[#ee224a] mb-3">2. Transforme conversas em agendamentos</h3>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">A cada novo contato, o sistema acompanha o funil automaticamente, registra os leads, identifica oportunidades e converte mensagens em agendamentos confirmados, sem esforço manual da sua equipe.</p>
             </div>
 
             <div className="flex flex-col items-center text-center group">
-              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border border-gray-100 dark:border-gray-700">
+              <div className="w-full aspect-[4/3] bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-8 overflow-hidden relative border" style={{ borderColor: 'var(--primary-dark)' }}>
                 <img alt="Automações e Métricas" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrMJVDEO2vT8gSHvaTg-OixgnW7DjzRS4Q1T1GGVh3wqlMaHcI103SF6wSxdFnq5q67kf77c-WyvNOA8XN6YIWNrmoqshk6xHnt78lWKkDC_iIUSMfhBzYhYlEKaealGZgy7JCSJfR0ZX2jYFFUQMrnk_vDrx66kl4O_nbuCyya-xH3f6fFVuKdZlm072k-N3jmjfDplnEfaEbrUFbCaTVDUdcBHzEEbBnCEUo9H7_CRaNOoTWM_t9lFeJ9jGOVkAmFGvWa9S2B4k"/>
-                <div className="absolute bottom-4 right-4 bg-[var(--primary)] text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">3</div>
+                <div className="absolute bottom-4 right-4 bg-white text-[#ee224a] w-10 h-10 rounded-full flex items-center justify-center shadow-lg font-bold text-xl">3</div>
               </div>
-              <h3 className="text-2xl font-bold text-black mb-3">3. Automações e métrica</h3>
-              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">MasterClínicas conecta completa e cuidar de clínica e autênticos em métrica — Impulsione sua operação com simplicidade e eficiência.</p>
+              <h3 className="text-2xl font-bold text-[#ee224a] mb-3">3. Acompanhe resultados e cresça com controle</h3>
+              <p className="text-gray-800 dark:text-text-muted-dark leading-relaxed">Visualize métricas claras de desempenho, taxa de conversão e agenda da clínica em tempo real. Tenha total controle da operação e tome decisões baseadas em dados para escalar seus resultados.</p>
             </div>
           </div>
         </div>
@@ -218,11 +217,11 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+                  <img src="/logo2-masterclinicas.png" alt="MasterClínicas" className="w-full h-full object-contain" />
                 </div>
-                <span className="font-bold">MasterClínicas</span>
+                <span className="font-bold text-[#ee224a]">MasterClínicas</span>
               </div>
               <p className="text-gray-400 text-sm">Plataforma de gestão para clínicas de estética — automações, métricas e atendimento em um só lugar.</p>
             </div>

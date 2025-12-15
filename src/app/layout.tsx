@@ -9,9 +9,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MasterClínicas | Plataforma SaaS para Clínicas de Estética",
+  title: "Master Clínicas®",
   description: "Sistema completo para gestão de clínicas de estética. Gerencie leads, agendamentos e métricas em um só lugar.",
   keywords: ["clínica estética", "gestão", "leads", "agendamentos", "SaaS"],
+  icons: {
+    icon: '/favicon-masterclinicas.ico',
+  },
 };
 
 export default function RootLayout({
