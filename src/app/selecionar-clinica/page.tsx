@@ -1,7 +1,7 @@
 // Página de Seleção de Clínica - Supabase Auth
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/pg";
 
 export default async function SelectOrganizationPage() {
   const supabase = await createServerSupabaseClient();
@@ -11,19 +11,14 @@ export default async function SelectOrganizationPage() {
     redirect("/login");
   }
 
-  // Buscar role do usuário no banco
-  const userRecord = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { role: true },
-  });
-
-  if (!userRecord) {
+  // Buscar role do usuário no banco via PG
+  const userRes = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+  if (!userRes.rows || userRes.rows.length === 0) {
     redirect("/login");
   }
 
-  // Com roles simplificados, redirecionar diretamente
-  // Super admin vai para /organizacoes, outros usuários vão para /dashboard
-  if (userRecord.role === "super_admin") {
+  const role = userRes.rows[0].role;
+  if (role === "super_admin") {
     redirect("/organizacoes");
   } else {
     redirect("/dashboard");

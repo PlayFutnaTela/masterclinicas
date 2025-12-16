@@ -1,7 +1,7 @@
 // Página Visão Geral do Dashboard
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getDashboardCards, getLeadsByStatus } from "@/lib/metrics";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/pg";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { MetricsChart } from "@/components/charts/metrics-chart";
 
@@ -9,24 +9,13 @@ async function getDashboardData(userId: string, organizationId: string) {
     const [cards, leadsByStatus, recentLeads] = await Promise.all([
         getDashboardCards(userId, organizationId),
         getLeadsByStatus(userId, organizationId),
-        prisma.lead.findMany({
-            where: { userId, organizationId },
-            orderBy: { createdAt: "desc" },
-            take: 5,
-        }),
+        query(`SELECT id, name, phone, procedure, status, created_at as "createdAt" FROM leads WHERE user_id = $1 AND organization_id = $2 ORDER BY created_at DESC LIMIT 5`, [userId, organizationId]).then(r => r.rows || []),
     ]);
 
     // Obter dados reais do banco para o gráfico (últimos 7 dias)
     const chartData = [];
-    const metricEvents = await prisma.metricEvent.findMany({
-        where: {
-            userId,
-            createdAt: {
-                gte: new Date(new Date().setDate(new Date().getDate() - 6)),
-            },
-        },
-        orderBy: { createdAt: "asc" },
-    });
+    const metricEventsRes = await query(`SELECT type, metadata, created_at FROM metric_events WHERE user_id = $1 AND created_at >= $2 ORDER BY created_at ASC`, [userId, new Date(new Date().setDate(new Date().getDate() - 6))]);
+    const metricEvents = metricEventsRes.rows || [];
 
     // Agrupar métricas por dia
     const metricsPerDay: { [key: string]: { leads: number; qualificados: number; agendamentos: number } } = {};
@@ -88,11 +77,8 @@ export default async function DashboardPage() {
     try {
         if (userData.role === "super_admin") {
             // Super admin vê dados de todas as organizações (usar primeira como padrão)
-            const org = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            organizationId = org?.id || "";
+            const orgRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            organizationId = orgRes.rows[0]?.id || "";
         } else {
             // Admin/operador usa organização associada
             organizationId = userData.organizationId || "";
