@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/role-middleware";
 import { getMetricsSummary, getMetricsOverTime, getDashboardCards } from "@/lib/metrics";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/pg";
 
 /**
  * GET /api/metricas
@@ -18,17 +18,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
-            return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
-        }
-
-        const userRole = userRecord.role;
+        // Buscar role do usuário no banco via PG
+        const userRes = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes.rows || userRes.rows.length === 0) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        const userRole = userRes.rows[0].role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver métricas =====
         requireRole(userRole, "operador");
@@ -38,25 +31,12 @@ export async function GET(request: NextRequest) {
         if (userRole === "super_admin") {
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId") || "";
-            if (!organizationId) {
-                return NextResponse.json(
-                    { error: "Super admin deve especificar organizationId" },
-                    { status: 400 }
-                );
-            }
+            if (!organizationId) return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
         } else {
             // Admin/operador usa organização padrão
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            if (!defaultOrg) {
-                return NextResponse.json(
-                    { error: "Nenhuma organização encontrada" },
-                    { status: 400 }
-                );
-            }
-            organizationId = defaultOrg.id;
+            const defaultRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes.rows || defaultRes.rows.length === 0) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
+            organizationId = defaultRes.rows[0].id;
         }
         const { searchParams } = new URL(request.url);
         const period = searchParams.get("period") || "30d"; // 7d, 30d, 90d, 365d
