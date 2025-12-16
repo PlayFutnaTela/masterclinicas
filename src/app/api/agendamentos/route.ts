@@ -1,8 +1,8 @@
 // API Route para gerenciamento de agendamentos - Supabase Auth
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/role-middleware";
+import { query } from "@/lib/pg";
+import { requireRole } from "@/lib/role-middleware"; 
 
 /**
  * GET /api/agendamentos
@@ -17,18 +17,13 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role E organizationId do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true, organizationId: true },
-        });
-
-        if (!userRecord) {
+        // Buscar role E organizationId do usuário no banco via PG
+        const userRes = await query("SELECT role, organization_id as \"organizationId\" FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes.rows || userRes.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
-        let organizationId: string | null = null;
+        const userRole = userRes.rows[0].role;
+        let organizationId: string | null = userRes.rows[0].organizationId || null; 
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver agendamentos =====
         requireRole(userRole, "operador");
@@ -40,11 +35,11 @@ export async function GET(request: NextRequest) {
             organizationId = url.searchParams.get("organizationId");
             // Se super_admin não especificar organizationId, usar a dele (se houver) ou mostrar de todas
             if (!organizationId) {
-                organizationId = userRecord.organizationId;
+                organizationId = userRes.rows[0].organizationId;
             }
         } else {
             // Admin/operador vê apenas da sua organização associada
-            organizationId = userRecord.organizationId;
+            organizationId = userRes.rows[0].organizationId;
         }
 
         // Se não houver organização, retornar lista vazia
@@ -94,10 +89,8 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // Tentar usar PG diretamente (mais resiliente para migração gradual). Se falhar, cair no Prisma.
+        // Usar PG diretamente
         try {
-            const { query } = await import("@/lib/pg");
-
             // Montar WHERE dinamicamente (atenção à orderBy / pagination)
             const whereClauses: string[] = ["organization_id = $1"];
             const params: any[] = [organizationId];
@@ -159,36 +152,8 @@ export async function GET(request: NextRequest) {
                 },
             });
         } catch (pgErr) {
-            console.warn("[API AGENDAMENTOS] PG fallback: erro ao usar pg, usando Prisma", pgErr);
-            const [appointments, total] = await Promise.all([
-                prisma.appointment.findMany({
-                    where,
-                    skip,
-                    take: limit,
-                    orderBy: { scheduledAt: "asc" },
-                    include: {
-                        lead: {
-                            select: {
-                                id: true,
-                                name: true,
-                                phone: true,
-                                procedure: true,
-                            },
-                        },
-                    },
-                }),
-                prisma.appointment.count({ where }),
-            ]);
-
-            return NextResponse.json({
-                appointments,
-                pagination: {
-                    page,
-                    limit,
-                    total,
-                    totalPages: Math.ceil(total / limit),
-                },
-            });
+            console.error("[API AGENDAMENTOS] PG error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API AGENDAMENTOS] GET - Erro completo:", error);
@@ -224,17 +189,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
+        // Buscar role do usuário no banco via PG
+        const userRes = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes.rows || userRes.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
+        const userRole = userRes.rows[0].role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem criar agendamentos =====
         requireRole(userRole, "operador");
@@ -246,24 +206,15 @@ export async function POST(request: NextRequest) {
             const body = await request.json();
             organizationId = body.organizationId;
             if (!organizationId) {
-                return NextResponse.json(
-                    { error: "Super admin deve especificar organizationId" },
-                    { status: 400 }
-                );
+                return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
             }
         } else {
-            // Admin/operador usa organização padrão
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            if (!defaultOrg) {
-                return NextResponse.json(
-                    { error: "Nenhuma organização encontrada" },
-                    { status: 400 }
-                );
+            // Admin/operador usa organização padrão -> buscar via PG
+            const defaultRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes.rows || defaultRes.rows.length === 0) {
+                return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
             }
-            organizationId = defaultOrg.id;
+            organizationId = defaultRes.rows[0].id;
         }
 
         const body = await request.json();
@@ -313,50 +264,9 @@ export async function POST(request: NextRequest) {
                 { status: 201 }
             );
         } catch (pgErr) {
-            try { const { query } = await import("@/lib/pg"); await query("ROLLBACK"); } catch(_) {}
-            console.warn("[API AGENDAMENTOS] PG fallback create: erro ao usar pg, usando Prisma", pgErr);
-
-            // Fallback para Prisma
-            const lead = await prisma.lead.findFirst({
-                where: {
-                    id: leadId,
-                    userId: user.id,
-                    organizationId,
-                },
-            });
-
-            if (!lead) {
-                return NextResponse.json(
-                    { error: "Lead não encontrado" },
-                    { status: 404 }
-                );
-            }
-
-            await prisma.lead.update({ where: { id: leadId }, data: { status: "agendado" } });
-
-            const appointment = await prisma.appointment.create({
-                data: {
-                    leadId,
-                    scheduledAt: new Date(scheduledAt),
-                    notes,
-                    userId: user.id,
-                    organizationId,
-                },
-            });
-
-            await prisma.metricEvent.create({
-                data: {
-                    type: "scheduled",
-                    metadata: { leadId, appointmentId: appointment.id },
-                    userId: user.id,
-                    organizationId,
-                },
-            });
-
-            return NextResponse.json(
-                { success: true, appointment },
-                { status: 201 }
-            );
+            try { await query("ROLLBACK"); } catch(_) {}
+            console.error("[API AGENDAMENTOS] PG create error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
@@ -388,17 +298,12 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
+        // Buscar role do usuário no banco via PG
+        const userRes2 = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes2.rows || userRes2.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
+        const userRole = userRes2.rows[0].role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem atualizar agendamentos =====
         requireRole(userRole, "operador");
@@ -409,23 +314,14 @@ export async function PATCH(request: NextRequest) {
             const body = await request.json();
             organizationId = body.organizationId;
             if (!organizationId) {
-                return NextResponse.json(
-                    { error: "Super admin deve especificar organizationId" },
-                    { status: 400 }
-                );
+                return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
             }
         } else {
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            if (!defaultOrg) {
-                return NextResponse.json(
-                    { error: "Nenhuma organização encontrada" },
-                    { status: 400 }
-                );
+            const defaultRes2 = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes2.rows || defaultRes2.rows.length === 0) {
+                return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
             }
-            organizationId = defaultOrg.id;
+            organizationId = defaultRes2.rows[0].id;
         }
 
         const body = await request.json();
@@ -479,29 +375,9 @@ export async function PATCH(request: NextRequest) {
             await query("COMMIT");
             return NextResponse.json({ success: true, appointment });
         } catch (pgErr) {
-            try { const { query } = await import("@/lib/pg"); await query("ROLLBACK"); } catch(_) {}
-            console.warn("[API AGENDAMENTOS] PG fallback update: erro ao usar pg, usando Prisma", pgErr);
-            const appointment = await prisma.appointment.update({
-                where: {
-                    id,
-                    userId: user.id,
-                    organizationId,
-                },
-                data: updateData,
-            });
-
-            if (status === "no_show") {
-                await prisma.metricEvent.create({
-                    data: {
-                        type: "no_show",
-                        metadata: { appointmentId: id },
-                        userId: user.id,
-                        organizationId,
-                    },
-                });
-            }
-
-            return NextResponse.json({ success: true, appointment });
+            try { await query("ROLLBACK"); } catch(_) {}
+            console.error("[API AGENDAMENTOS] PG update error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
@@ -535,25 +411,24 @@ export async function DELETE(request: NextRequest) {
 
         if (!id) return NextResponse.json({ error: "ID do agendamento é obrigatório" }, { status: 400 });
 
-        // Buscar role do usuário
-        const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
-        if (!userRecord) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
-        const userRole = userRecord.role;
-        requireRole(userRole, "operador");
+        // Buscar role do usuário via PG
+        const userRes3 = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes3.rows || userRes3.rows.length === 0) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        const userRole2 = userRes3.rows[0].role;
+        requireRole(userRole2, "operador");
 
         // Determinar organizationId
         let organizationId: string;
-        if (userRole === "super_admin") {
+        if (userRole2 === "super_admin") {
             if (!providedOrg) return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
             organizationId = providedOrg;
         } else {
-            const defaultOrg = await prisma.organization.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
-            if (!defaultOrg) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
-            organizationId = defaultOrg.id;
+            const defaultRes3 = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes3.rows || defaultRes3.rows.length === 0) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
+            organizationId = defaultRes3.rows[0].id;
         }
 
         try {
-            const { query } = await import("@/lib/pg");
             const res = await query("DELETE FROM appointments WHERE id = $1 AND user_id = $2 AND organization_id = $3 RETURNING *", [id, user.id, organizationId]);
             const deleted = res.rows[0];
             if (!deleted) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
@@ -568,11 +443,8 @@ export async function DELETE(request: NextRequest) {
 
             return NextResponse.json({ success: true, deleted });
         } catch (pgErr) {
-            console.warn("[API AGENDAMENTOS] PG fallback delete: erro ao usar pg, usando Prisma", pgErr);
-            const deleted = await prisma.appointment.deleteMany({ where: { id, userId: user.id, organizationId } });
-            if (!deleted.count) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
-            await prisma.metricEvent.create({ data: { type: "no_show", metadata: { appointmentId: id }, userId: user.id, organizationId } }).catch(() => {});
-            return NextResponse.json({ success: true, deleted });
+            console.error("[API AGENDAMENTOS] PG delete error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API AGENDAMENTOS] DELETE - Erro:", error);
