@@ -5,10 +5,15 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
   helperText?: string
+  onValueChange?: (value: any) => void
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className = "", label, error, helperText, id, ...props }, ref) => {
+  ({ className = "", label, error, helperText, id, onValueChange, onChange, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onChange?.(e as any);
+      if (onValueChange) onValueChange(e.target.value);
+    };
     return (
       <div className="w-full">
         {label && (
@@ -30,6 +35,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               ${error ? "border-destructive bg-destructive/10" : "border-input hover:border-input/70"}
               ${className}
             `}
+            onChange={handleChange}
             {...props}
           />
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none text-muted-foreground" />

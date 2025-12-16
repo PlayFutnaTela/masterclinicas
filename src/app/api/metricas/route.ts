@@ -151,8 +151,16 @@ export async function GET(request: NextRequest) {
         }
     } catch (error) {
         console.error("[API METRICAS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }

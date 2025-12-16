@@ -1,5 +1,7 @@
 import NextAuth from "next-auth";
-import { UserRole } from "@prisma/client";
+
+// Local UserRole type mirroring Prisma schema enums. This avoids depending on @prisma/client types.
+type UserRole = "super_admin" | "admin" | "operador";
 
 declare module "next-auth" {
   interface User {

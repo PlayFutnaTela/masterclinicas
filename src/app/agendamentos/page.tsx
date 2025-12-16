@@ -67,7 +67,20 @@ export default function AgendamentosPage() {
         })
 
         if (!response.ok) {
-          throw new Error(`Erro ${response.status}: ${response.statusText}`)
+          let errMsg = `Erro ${response.status}: ${response.statusText}`;
+          try {
+            const errData = await response.json();
+            if (errData?.error) {
+                errMsg = errData.error + (errData.details ? `: ${errData.details}` : "");
+                if (response.status === 503) {
+                    errMsg += " — Banco de dados indisponível. Verifique suas variáveis de ambiente e a conectividade à instância do Supabase/Postgres.";
+                }
+            }
+          } catch (e) {
+            // ignore parse error
+          }
+
+          throw new Error(errMsg);
         }
 
         const data = await response.json()
@@ -101,7 +114,19 @@ export default function AgendamentosPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Erro ao criar agendamento")
+        let errMsg = `Erro ${response.status}: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) {
+            errMsg = errData.error + (errData.details ? `: ${errData.details}` : "");
+            if (response.status === 503) {
+              errMsg += " — Banco de dados indisponível. Verifique suas variáveis de ambiente e a conectividade à instância do Supabase/Postgres.";
+            }
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+        throw new Error(errMsg);
       }
 
       // Recarregar lista
@@ -130,7 +155,19 @@ export default function AgendamentosPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Erro ao atualizar agendamento")
+        let errMsg = `Erro ${response.status}: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) {
+            errMsg = errData.error + (errData.details ? `: ${errData.details}` : "");
+            if (response.status === 503) {
+              errMsg += " — Banco de dados indisponível. Verifique suas variáveis de ambiente e a conectividade à instância do Supabase/Postgres.";
+            }
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+        throw new Error(errMsg);
       }
 
       // Recarregar lista
@@ -154,7 +191,19 @@ export default function AgendamentosPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Erro ao deletar agendamento")
+        let errMsg = `Erro ${response.status}: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) {
+            errMsg = errData.error + (errData.details ? `: ${errData.details}` : "");
+            if (response.status === 503) {
+              errMsg += " — Banco de dados indisponível. Verifique suas variáveis de ambiente e a conectividade à instância do Supabase/Postgres.";
+            }
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+        throw new Error(errMsg);
       }
 
       // Recarregar lista

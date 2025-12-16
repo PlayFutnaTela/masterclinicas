@@ -1,6 +1,15 @@
 // Utilitários de métricas para agregação de dados - Multi-Tenant
-import { prisma } from "./db";
-import { MetricEventType } from "@prisma/client";
+// Use PG for metrics aggregation to remove Prisma dependency gradually
+import { query as pgQuery } from "./pg";
+
+// Local MetricEventType to avoid importing from @prisma/client
+type MetricEventType =
+    | "lead_received"
+    | "qualified"
+    | "scheduled"
+    | "no_show"
+    | "follow_up"
+    | "conversion";
 
 interface MetricsSummary {
     leadsReceived: number;
@@ -25,20 +34,14 @@ export async function getMetricsSummary(
     endDate: Date,
     organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ): Promise<MetricsSummary> {
-    const events = await prisma.metricEvent.groupBy({
-        by: ["type"],
-        where: {
-            userId,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-            createdAt: {
-                gte: startDate,
-                lte: endDate,
-            },
-        },
-        _count: {
-            type: true,
-        },
-    });
+    const sql = `
+        SELECT type, COUNT(*)::int as cnt
+        FROM metric_events
+        WHERE user_id = $1 AND organization_id = $2 AND created_at >= $3 AND created_at <= $4
+        GROUP BY type
+    `;
+
+    const res = await pgQuery(sql, [userId, organizationId, startDate.toISOString(), endDate.toISOString()]);
 
     const summary: MetricsSummary = {
         leadsReceived: 0,
@@ -48,22 +51,22 @@ export async function getMetricsSummary(
         conversions: 0,
     };
 
-    events.forEach((event) => {
-        switch (event.type) {
+    res.rows.forEach((row: any) => {
+        switch (row.type) {
             case "lead_received":
-                summary.leadsReceived += event._count.type;
+                summary.leadsReceived = row.cnt;
                 break;
             case "qualified":
-                summary.qualified += event._count.type;
+                summary.qualified = row.cnt;
                 break;
             case "scheduled":
-                summary.scheduled += event._count.type;
+                summary.scheduled = row.cnt;
                 break;
             case "no_show":
-                summary.noShow += event._count.type;
+                summary.noShow = row.cnt;
                 break;
             case "conversion":
-                summary.conversions += event._count.type;
+                summary.conversions = row.cnt;
                 break;
         }
     });
@@ -81,38 +84,24 @@ export async function getMetricsOverTime(
     eventType?: MetricEventType,
     organizationId?: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ): Promise<MetricsOverTime[]> {
-    const events = await prisma.metricEvent.findMany({
-        where: {
-            userId,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-            createdAt: {
-                gte: startDate,
-                lte: endDate,
-            },
-            ...(eventType && { type: eventType }),
-        },
-        orderBy: { createdAt: "asc" },
-    });
+    const sql = `
+        SELECT date_trunc('day', created_at)::date as day, type, COUNT(*)::int as cnt
+        FROM metric_events
+        WHERE user_id = $1 AND organization_id = $2 AND created_at >= $3 AND created_at <= $4
+        ${eventType ? "AND type = $5" : ""}
+        GROUP BY day, type
+        ORDER BY day ASC
+    `;
 
-    // Agrupar por data e tipo
-    const grouped = new Map<string, { count: number; type: MetricEventType }>();
+    const params: any[] = [userId, organizationId, startDate.toISOString(), endDate.toISOString()];
+    if (eventType) params.push(eventType);
 
-    events.forEach((event) => {
-        const date = event.createdAt.toLocaleDateString("pt-BR");
-        const key = `${date}-${event.type}`;
+    const res = await pgQuery(sql, params);
 
-        if (grouped.has(key)) {
-            const existing = grouped.get(key)!;
-            existing.count += 1;
-        } else {
-            grouped.set(key, { count: 1, type: event.type });
-        }
-    });
-
-    return Array.from(grouped.entries()).map(([_, value]) => ({
-        date: value.type,
-        count: value.count,
-        type: value.type,
+    return res.rows.map((row: any) => ({
+        date: new Date(row.day).toLocaleDateString("pt-BR"),
+        count: row.cnt,
+        type: row.type,
     }));
 }
 
@@ -123,16 +112,9 @@ export async function getLeadsByStatus(
     userId: string,
     organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ) {
-    return await prisma.lead.groupBy({
-        by: ["status"],
-        where: {
-            userId,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-        },
-        _count: {
-            status: true,
-        },
-    });
+    const sql = `SELECT status, COUNT(*)::int as count FROM leads WHERE user_id = $1 AND organization_id = $2 GROUP BY status`;
+    const res = await pgQuery(sql, [userId, organizationId]);
+    return res.rows;
 }
 
 /**
@@ -142,16 +124,9 @@ export async function getAppointmentsByStatus(
     userId: string,
     organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ) {
-    return await prisma.appointment.groupBy({
-        by: ["status"],
-        where: {
-            userId,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-        },
-        _count: {
-            status: true,
-        },
-    });
+    const sql = `SELECT status, COUNT(*)::int as count FROM appointments WHERE user_id = $1 AND organization_id = $2 GROUP BY status`;
+    const res = await pgQuery(sql, [userId, organizationId]);
+    return res.rows;
 }
 
 /**
@@ -161,42 +136,20 @@ export async function getDashboardCards(
     userId: string,
     organizationId: string // ===== MULTI-TENANT: Adicionar organizationId =====
 ) {
-    const where = {
-        userId,
-        organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-    };
+    const startToday = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const endToday = new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
 
-    const [
-        totalLeads,
-        qualifiedLeads,
-        scheduledAppointments,
-        todayAppointments,
-    ] = await Promise.all([
-        prisma.lead.count({ where }),
-        prisma.lead.count({
-            where: { ...where, status: "qualificado" },
-        }),
-        prisma.appointment.count({
-            where: {
-                ...where,
-                status: { in: ["agendado", "confirmado"] },
-            },
-        }),
-        prisma.appointment.count({
-            where: {
-                ...where,
-                scheduledAt: {
-                    gte: new Date(new Date().setHours(0, 0, 0, 0)),
-                    lt: new Date(new Date().setHours(23, 59, 59, 999)),
-                },
-            },
-        }),
+    const [totalLeadsRes, qualifiedLeadsRes, scheduledAppointmentsRes, todayAppointmentsRes] = await Promise.all([
+        pgQuery(`SELECT COUNT(*)::int as total FROM leads WHERE user_id = $1 AND organization_id = $2`, [userId, organizationId]),
+        pgQuery(`SELECT COUNT(*)::int as total FROM leads WHERE user_id = $1 AND organization_id = $2 AND status = $3`, [userId, organizationId, "qualificado"]),
+        pgQuery(`SELECT COUNT(*)::int as total FROM appointments WHERE user_id = $1 AND organization_id = $2 AND status = ANY($3::text[])`, [userId, organizationId, ["agendado", "confirmado"]]),
+        pgQuery(`SELECT COUNT(*)::int as total FROM appointments WHERE user_id = $1 AND organization_id = $2 AND scheduled_at >= $3 AND scheduled_at < $4`, [userId, organizationId, startToday, endToday]),
     ]);
 
     return {
-        totalLeads,
-        qualifiedLeads,
-        scheduledAppointments,
-        todayAppointments,
+        totalLeads: totalLeadsRes.rows[0]?.total || 0,
+        qualifiedLeads: qualifiedLeadsRes.rows[0]?.total || 0,
+        scheduledAppointments: scheduledAppointmentsRes.rows[0]?.total || 0,
+        todayAppointments: todayAppointmentsRes.rows[0]?.total || 0,
     };
 }

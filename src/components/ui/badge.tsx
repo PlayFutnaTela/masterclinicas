@@ -2,18 +2,20 @@
 import { HTMLAttributes, forwardRef } from "react";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-    variant?: "default" | "success" | "warning" | "danger" | "info";
+    variant?: "default" | "success" | "warning" | "danger" | "info" | "secondary" | "outline";
 }
 
 const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
     ({ className = "", variant = "default", children, ...props }, ref) => {
         const variants = {
             default: "bg-secondary text-secondary-foreground",
+            secondary: "bg-secondary text-secondary-foreground",
+            outline: "border border-input text-foreground bg-transparent",
             success: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200",
             warning: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200",
             danger: "bg-destructive text-destructive-foreground",
             info: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200",
-        };
+        }; 
 
         return (
             <span

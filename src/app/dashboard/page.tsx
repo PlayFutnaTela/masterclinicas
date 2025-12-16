@@ -38,7 +38,7 @@ async function getDashboardData(userId: string, organizationId: string) {
     }
 
     // Contar eventos de métrica por dia
-    metricEvents.forEach((event) => {
+    metricEvents.forEach((event: any) => {
         const dateStr = event.createdAt.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" });
         if (metricsPerDay[dateStr]) {
             if (event.type === "lead_received") metricsPerDay[dateStr].leads++;
@@ -80,21 +80,32 @@ export default async function DashboardPage() {
         return null;
     }
 
-    // Determinar organização
-    let organizationId: string;
-    if (userData.role === "super_admin") {
-        // Super admin vê dados de todas as organizações (usar primeira como padrão)
-        const org = await prisma.organization.findFirst({
-            orderBy: { createdAt: "asc" },
-            select: { id: true }
-        });
-        organizationId = org?.id || "";
-    } else {
-        // Admin/operador usa organização associada
-        organizationId = userData.organizationId || "";
-    }
+    // Determinar organização e carregar dados do dashboard de forma resiliente
+    let organizationId: string = "";
+    let cards = { totalLeads: 0, qualifiedLeads: 0, scheduledAppointments: 0, todayAppointments: 0 };
+    let chartData: any[] = [];
 
-    const { cards, chartData } = await getDashboardData(user.id, organizationId);
+    try {
+        if (userData.role === "super_admin") {
+            // Super admin vê dados de todas as organizações (usar primeira como padrão)
+            const org = await prisma.organization.findFirst({
+                orderBy: { createdAt: "asc" },
+                select: { id: true }
+            });
+            organizationId = org?.id || "";
+        } else {
+            // Admin/operador usa organização associada
+            organizationId = userData.organizationId || "";
+        }
+
+        const dashboard = await getDashboardData(user.id, organizationId);
+        cards = dashboard.cards;
+        chartData = dashboard.chartData;
+    } catch (err) {
+        // Falha ao conectar/consultar o banco: logar e mostrar dashboard em modo degradado
+        console.error("[DASHBOARD] Erro ao carregar dados do dashboard:", err);
+        // cards/chartData permanecem em zeros/arrays vazias
+    }
 
     return (
         <div className="space-y-6">

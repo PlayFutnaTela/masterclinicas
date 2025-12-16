@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/role-middleware";
-import { LeadStatus } from "@prisma/client";
+
+// Local LeadStatus type matching Prisma schema to remove dependency on @prisma/client
+type LeadStatus = "novo" | "qualificado" | "agendado" | "perdido";
 
 /**
  * GET /api/leads
@@ -19,8 +21,7 @@ export async function GET(request: NextRequest) {
         }
 
 // Buscar role do usuário no banco via PG (mais confiável para remover Prisma)
-    try {
-        const { query } = await import("@/lib/pg");
+    const { query } = await import("@/lib/pg");
         const userRes = await query("SELECT role, organization_id as \"organizationId\" FROM users WHERE id = $1", [user.id]);
         if (!userRes || userRes.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
@@ -60,6 +61,14 @@ export async function GET(request: NextRequest) {
         const search = searchParams.get("search");
 
         const skip = (page - 1) * limit;
+
+        // Prisma-compatible where object for fallback
+        const where: any = { organizationId };
+        if (status) where.status = status;
+        if (search) where.OR = [
+            { name: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search } },
+        ];
 
         try {
             const { query } = await import("@/lib/pg");

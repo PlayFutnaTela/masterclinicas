@@ -1,7 +1,7 @@
 // Webhook endpoint para receber dados do n8n - Simplified Roles
 // Eventos: novo lead, lead qualificado, agendamento, métricas
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/pg";
 
 // Tipos de eventos aceitos
 type WebhookEventType =
@@ -40,198 +40,123 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Verificar se a organização existe
-        const organization = await prisma.organization.findUnique({
-            where: { id: body.organizationId },
-        });
+        // Usar PG primariamente
+        try {
+            // Verificar org
+            const orgRes = await query("SELECT id FROM organizations WHERE id = $1", [body.organizationId]);
+            if (!orgRes.rows || orgRes.rows.length === 0) {
+                return NextResponse.json({ error: "Organização não encontrada" }, { status: 404 });
+            }
 
-        if (!organization) {
-            return NextResponse.json(
-                { error: "Organização não encontrada" },
-                { status: 404 }
-            );
+            // Escolher um usuário admin para atribuições (melhorar no futuro)
+            const userRes = await query("SELECT id FROM users WHERE role = ANY($1::text[]) ORDER BY created_at ASC LIMIT 1", [["admin", "super_admin"]]);
+            const user = userRes.rows[0];
+            if (!user) return NextResponse.json({ error: "Nenhum usuário administrador encontrado" }, { status: 500 });
+
+            switch (body.type) {
+                case "new_lead": {
+                    try {
+                        await query("BEGIN");
+                        const insertLeadSql = `INSERT INTO leads (name, phone, procedure, source, status, user_id, organization_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`;
+                        const leadRes = await query(insertLeadSql, [
+                            (body.data.name as string) || "Sem nome",
+                            (body.data.phone as string) || "",
+                            (body.data.procedure as string) || "",
+                            (body.data.source as string) || "n8n",
+                            "novo",
+                            user.id,
+                            body.organizationId,
+                        ]);
+                        const leadId = leadRes.rows[0].id;
+
+                        await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                            "lead_received",
+                            JSON.stringify({ leadId }),
+                            user.id,
+                            body.organizationId,
+                        ]);
+
+                        await query("COMMIT");
+
+                        return NextResponse.json({ success: true, leadId });
+                    } catch (pgErr) {
+                        await query("ROLLBACK").catch(() => {});
+                        console.error("[WEBHOOK N8N] PG create lead failed:", pgErr);
+                        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+                    }
+                }
+
+                case "lead_qualified": {
+                    const leadId = body.data.leadId as string;
+                    if (!leadId) return NextResponse.json({ error: "leadId é obrigatório" }, { status: 400 });
+
+                    const leadRes = await query("SELECT id FROM leads WHERE id = $1 AND organization_id = $2 LIMIT 1", [leadId, body.organizationId]);
+                    if (!leadRes.rows || leadRes.rows.length === 0) return NextResponse.json({ error: "Lead não encontrado ou não pertence a esta organização" }, { status: 404 });
+
+                    await query("UPDATE leads SET status = $1 WHERE id = $2", ["qualificado", leadId]);
+                    await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                        "qualified",
+                        JSON.stringify({ leadId }),
+                        user.id,
+                        body.organizationId,
+                    ]);
+
+                    return NextResponse.json({ success: true });
+                }
+
+                case "appointment_created": {
+                    const { leadId, scheduledAt } = body.data as { leadId: string; scheduledAt: string };
+                    if (!leadId || !scheduledAt) return NextResponse.json({ error: "leadId e scheduledAt são obrigatórios" }, { status: 400 });
+
+                    const leadRes = await query("SELECT id FROM leads WHERE id = $1 AND organization_id = $2 LIMIT 1", [leadId, body.organizationId]);
+                    if (!leadRes.rows || leadRes.rows.length === 0) return NextResponse.json({ error: "Lead não encontrado ou não pertence a esta organização" }, { status: 404 });
+
+                    try {
+                        await query("BEGIN");
+                        await query("UPDATE leads SET status = $1 WHERE id = $2", ["agendado", leadId]);
+                        const apptRes = await query("INSERT INTO appointments (lead_id, scheduled_at, status, user_id, organization_id) VALUES ($1,$2,$3,$4,$5) RETURNING id", [leadId, new Date(scheduledAt), "agendado", user.id, body.organizationId]);
+                        const appointmentId = apptRes.rows[0].id;
+
+                        await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                            "scheduled",
+                            JSON.stringify({ leadId, appointmentId }),
+                            user.id,
+                            body.organizationId,
+                        ]);
+
+                        await query("COMMIT");
+
+                        return NextResponse.json({ success: true, appointmentId });
+                    } catch (pgErr) {
+                        await query("ROLLBACK").catch(() => {});
+                        console.error("[WEBHOOK N8N] PG create appointment failed:", pgErr);
+                        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+                    }
+                }
+
+                case "metric_event": {
+                    const { eventType, metadata } = body.data as { eventType: string; metadata?: Record<string, unknown> };
+                    if (!eventType) return NextResponse.json({ error: "eventType é obrigatório" }, { status: 400 });
+
+                    await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                        eventType,
+                        JSON.stringify(metadata || {}),
+                        user.id,
+                        body.organizationId,
+                    ]);
+
+                    return NextResponse.json({ success: true });
+                }
+
+                default:
+                    return NextResponse.json({ error: `Tipo de evento desconhecido: ${body.type}` }, { status: 400 });
+            }
+        } catch (err) {
+            console.error('[WEBHOOK N8N] PG processing error:', err);
+            return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
         }
 
-        // Para webhooks, usar o primeiro usuário admin da organização
-        // TODO: Melhorar isso no futuro com API keys específicas
-        const user = await prisma.user.findFirst({
-            where: {
-                role: { in: ["admin", "super_admin"] }
-            },
-            orderBy: { createdAt: "asc" }
-        });
-
-        if (!user) {
-            return NextResponse.json(
-                { error: "Nenhum usuário administrador encontrado" },
-                { status: 500 }
-            );
-        }
-
-        // Processar evento por tipo
-        switch (body.type) {
-            case "new_lead": {
-                const lead = await prisma.lead.create({
-                    data: {
-                        name: (body.data.name as string) || "Sem nome",
-                        phone: (body.data.phone as string) || "",
-                        procedure: (body.data.procedure as string) || "",
-                        source: (body.data.source as string) || "n8n",
-                        status: "novo",
-                        userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-
-                // Criar evento de métrica
-                await prisma.metricEvent.create({
-                    data: {
-                        type: "lead_received",
-                        metadata: { leadId: lead.id },
-                        userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-
-                return NextResponse.json({ success: true, leadId: lead.id });
-            }
-
-            case "lead_qualified": {
-                const leadId = body.data.leadId as string;
-                if (!leadId) {
-                    return NextResponse.json(
-                        { error: "leadId é obrigatório" },
-                        { status: 400 }
-                    );
-                }
-
-                // ===== MULTI-TENANT: Validar que o lead pertence à organização =====
-                const lead = await prisma.lead.findFirst({
-                    where: {
-                        id: leadId,
-                        userId: user.id,
-                        organizationId: body.organizationId,
-                    },
-                });
-
-                if (!lead) {
-                    return NextResponse.json(
-                        { error: "Lead não encontrado ou não pertence a esta organização" },
-                        { status: 404 }
-                    );
-                }
-                // ===== FIM VALIDAÇÃO MULTI-TENANT =====
-
-                await prisma.lead.update({
-                    where: { id: leadId },
-                    data: { status: "qualificado" },
-                });
-
-                await prisma.metricEvent.create({
-                    data: {
-                        type: "qualified",
-                        metadata: { leadId },
-                        userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-
-                return NextResponse.json({ success: true });
-            }
-
-            case "appointment_created": {
-                const { leadId, scheduledAt } = body.data as {
-                    leadId: string;
-                    scheduledAt: string;
-                };
-
-                if (!leadId || !scheduledAt) {
-                    return NextResponse.json(
-                        { error: "leadId e scheduledAt são obrigatórios" },
-                        { status: 400 }
-                    );
-                }
-
-                // ===== MULTI-TENANT: Validar que o lead pertence à organização =====
-                const lead = await prisma.lead.findFirst({
-                    where: {
-                        id: leadId,
-                        userId: user.id,
-                        organizationId: body.organizationId,
-                    },
-                });
-
-                if (!lead) {
-                    return NextResponse.json(
-                        { error: "Lead não encontrado ou não pertence a esta organização" },
-                        { status: 404 }
-                    );
-                }
-                // ===== FIM VALIDAÇÃO MULTI-TENANT =====
-
-                // Atualizar status do lead
-                await prisma.lead.update({
-                    where: { id: leadId },
-                    data: { status: "agendado" },
-                });
-
-                // Criar agendamento
-                const appointment = await prisma.appointment.create({
-                    data: {
-                        leadId,
-                        scheduledAt: new Date(scheduledAt),
-                        status: "agendado",
-                        userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-
-                await prisma.metricEvent.create({
-                    data: {
-                        type: "scheduled",
-                        metadata: { leadId, appointmentId: appointment.id },
-                        userId: user.id,
-                        organizationId: body.organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-
-                return NextResponse.json({
-                    success: true,
-                    appointmentId: appointment.id,
-                });
-            }
-
-            case "metric_event": {
-                const { eventType, metadata } = body.data as {
-                    eventType: string;
-                    metadata?: Record<string, unknown>;
-                };
-
-                if (!eventType) {
-                    return NextResponse.json(
-                        { error: "eventType é obrigatório" },
-                        { status: 400 }
-                    );
-                }
-
-                await prisma.metricEvent.create({
-                    data: {
-                        type: eventType as "lead_received" | "qualified" | "scheduled" | "no_show" | "follow_up" | "conversion",
-                        metadata: (metadata || {}) as any,
-                        userId: user.id,
-                        organizationId: body.organizationId,
-                    },
-                });
-
-                return NextResponse.json({ success: true });
-            }
-
-            default:
-                return NextResponse.json(
-                    { error: `Tipo de evento desconhecido: ${body.type}` },
-                    { status: 400 }
-                );
-        }
+        // Prisma fallback removido — agora usamos apenas `pg` (transações/insert) e retornamos erro 500 em falhas.
     } catch (error) {
         console.error("[WEBHOOK N8N] Erro:", error);
 

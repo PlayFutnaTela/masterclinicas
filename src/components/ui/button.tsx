@@ -2,8 +2,8 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "primary" | "secondary" | "danger" | "ghost" | "primary-brand";
-    size?: "sm" | "md" | "lg";
+    variant?: "primary" | "secondary" | "danger" | "ghost" | "primary-brand" | "outline";
+    size?: "sm" | "md" | "lg" | "icon";
     isLoading?: boolean;
 }
 
@@ -17,13 +17,15 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-ring",
             danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-ring",
             ghost: "bg-transparent text-foreground hover:bg-accent focus:ring-ring",
+            outline: "bg-transparent text-foreground border border-input hover:bg-accent focus:ring-ring",
         };
 
-        const sizes = {
+        const sizes: Record<string, string> = {
             sm: "px-3 py-1.5 text-sm",
             md: "px-4 py-2 text-sm",
             lg: "px-6 py-3 text-base",
-        };
+            icon: "h-8 w-8 p-0",
+        }; 
 
         return (
             <button

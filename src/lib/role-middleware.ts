@@ -1,11 +1,12 @@
 // Middleware para validação de roles - Simplified System
-import { UserRole } from "@prisma/client";
+// Local UserRole type to avoid importing from @prisma/client
+export type UserRole = "super_admin" | "admin" | "operador";
 
 export function hasPermission(
   userRole: UserRole,
-  requiredRole: "super_admin" | "admin" | "operador"
+  requiredRole: UserRole
 ): boolean {
-  const roleHierarchy: { [key in UserRole]: number } = {
+  const roleHierarchy: Record<UserRole, number> = {
     super_admin: 4,
     admin: 3,
     operador: 1,
@@ -14,15 +15,10 @@ export function hasPermission(
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }
 
-export function requireRole(
-  userRole: UserRole,
-  requiredRole: "super_admin" | "admin" | "operador"
-) {
+export function requireRole(userRole: UserRole, requiredRole: UserRole) {
   const hasAccess = hasPermission(userRole, requiredRole);
   if (!hasAccess) {
-    throw new Error(
-      `Acesso negado: requer permissão de ${requiredRole}`
-    );
+    throw new Error(`Acesso negado: requer permissão de ${requiredRole}`);
   }
 }
 

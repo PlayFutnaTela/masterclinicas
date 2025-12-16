@@ -579,19 +579,4 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
     }
 }
-    } catch (error) {
-        console.error("[API AGENDAMENTOS] Erro:", error);
-        const msg = error instanceof Error ? error.message : String(error);
-        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
-        if (isDbDown) {
-            return NextResponse.json(
-                { error: "Banco de dados indisponível", details: msg },
-                { status: 503 }
-            );
-        }
-        return NextResponse.json(
-            { error: "Erro interno do servidor", details: msg },
-            { status: 500 }
-        );
-    }
-}
+

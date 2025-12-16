@@ -36,7 +36,6 @@ export interface Event {
   color: string
   category?: string
   attendees?: string[]
-  tags?: string[]
 }
 
 export interface EventManagerProps {
@@ -48,7 +47,6 @@ export interface EventManagerProps {
   colors?: { name: string; value: string; bg: string; text: string }[]
   defaultView?: "month" | "week" | "day" | "list"
   className?: string
-  availableTags?: string[]
 }
 
 const defaultColors = [
@@ -69,7 +67,6 @@ export function EventManager({
   colors = defaultColors,
   defaultView = "month",
   className,
-  availableTags = ["Important", "Urgent", "Work", "Personal", "Team", "Client"],
 }: EventManagerProps) {
   const [events, setEvents] = useState<Event[]>(initialEvents)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -83,12 +80,10 @@ export function EventManager({
     description: "",
     color: colors[0].value,
     category: categories[0],
-    tags: [],
   })
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedColors, setSelectedColors] = useState<string[]>([])
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 
   const filteredEvents = useMemo(() => {
@@ -99,8 +94,7 @@ export function EventManager({
         const matchesSearch =
           event.title.toLowerCase().includes(query) ||
           event.description?.toLowerCase().includes(query) ||
-          event.category?.toLowerCase().includes(query) ||
-          event.tags?.some((tag) => tag.toLowerCase().includes(query))
+          event.category?.toLowerCase().includes(query)
 
         if (!matchesSearch) return false
       }
@@ -110,12 +104,6 @@ export function EventManager({
         return false
       }
 
-      // Tag filter
-      if (selectedTags.length > 0) {
-        const hasMatchingTag = event.tags?.some((tag) => selectedTags.includes(tag))
-        if (!hasMatchingTag) return false
-      }
-
       // Category filter
       if (selectedCategories.length > 0 && event.category && !selectedCategories.includes(event.category)) {
         return false
@@ -123,13 +111,12 @@ export function EventManager({
 
       return true
     })
-  }, [events, searchQuery, selectedColors, selectedTags, selectedCategories])
+  }, [events, searchQuery, selectedColors, selectedCategories])
 
-  const hasActiveFilters = selectedColors.length > 0 || selectedTags.length > 0 || selectedCategories.length > 0
+  const hasActiveFilters = selectedColors.length > 0 || selectedCategories.length > 0
 
   const clearFilters = () => {
     setSelectedColors([])
-    setSelectedTags([])
     setSelectedCategories([])
     setSearchQuery("")
   }
@@ -146,7 +133,6 @@ export function EventManager({
       color: newEvent.color || colors[0].value,
       category: newEvent.category,
       attendees: newEvent.attendees,
-      tags: newEvent.tags || [],
     }
 
     setEvents((prev) => [...prev, event])
@@ -158,7 +144,6 @@ export function EventManager({
       description: "",
       color: colors[0].value,
       category: categories[0],
-      tags: [],
     })
   }, [newEvent, colors, categories, onEventCreate])
 
@@ -238,23 +223,6 @@ export function EventManager({
     [colors],
   )
 
-  const toggleTag = (tag: string, isCreating: boolean) => {
-    if (isCreating) {
-      setNewEvent((prev) => ({
-        ...prev,
-        tags: prev.tags?.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...(prev.tags || []), tag],
-      }))
-    } else {
-      setSelectedEvent((prev) =>
-        prev
-          ? {
-              ...prev,
-              tags: prev.tags?.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...(prev.tags || []), tag],
-            }
-          : null,
-      )
-    }
-  }
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -282,13 +250,13 @@ export function EventManager({
             {view === "list" && "All Events"}
           </h2>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => navigateDate("prev")} className="h-8 w-8">
+            <Button variant="ghost" size="md" onClick={() => navigateDate("prev")} className="h-8 w-8">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+            <Button variant="ghost" size="md" onClick={() => setCurrentDate(new Date())}>
               Today
             </Button>
-            <Button variant="outline" size="icon" onClick={() => navigateDate("next")} className="h-8 w-8">
+            <Button variant="ghost" size="md" onClick={() => navigateDate("next")} className="h-8 w-8">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -297,7 +265,7 @@ export function EventManager({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {/* Mobile: Select dropdown */}
           <div className="sm:hidden">
-            <Select value={view} onValueChange={(value: any) => setView(value)}>
+            <Select value={view} onValueChange={(value: "month" | "week" | "day" | "list") => setView(value)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -410,11 +378,11 @@ export function EventManager({
             {/* Color Filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
+                <Button variant="ghost" size="md" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
                   <Filter className="h-4 w-4" />
                   Colors
                   {selectedColors.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                    <Badge variant="default" className="ml-1 h-5 px-1.5">
                       {selectedColors.length}
                     </Badge>
                   )}
@@ -427,7 +395,7 @@ export function EventManager({
                   <DropdownMenuCheckboxItem
                     key={color.value}
                     checked={selectedColors.includes(color.value)}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       setSelectedColors((prev) =>
                         checked ? [...prev, color.value] : prev.filter((c) => c !== color.value),
                       )
@@ -442,44 +410,15 @@ export function EventManager({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Tag Filter */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
-                  <Filter className="h-4 w-4" />
-                  Tags
-                  {selectedTags.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                      {selectedTags.length}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuLabel>Filter by Tag</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableTags.map((tag) => (
-                  <DropdownMenuCheckboxItem
-                    key={tag}
-                    checked={selectedTags.includes(tag)}
-                    onCheckedChange={(checked) => {
-                      setSelectedTags((prev) => (checked ? [...prev, tag] : prev.filter((t) => t !== tag)))
-                    }}
-                  >
-                    {tag}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             {/* Category Filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
+                <Button variant="ghost" size="md" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
                   <Filter className="h-4 w-4" />
                   Categories
                   {selectedCategories.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                    <Badge variant="default" className="ml-1 h-5 px-1.5">
                       {selectedCategories.length}
                     </Badge>
                   )}
@@ -492,7 +431,7 @@ export function EventManager({
                   <DropdownMenuCheckboxItem
                     key={category}
                     checked={selectedCategories.includes(category)}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       setSelectedCategories((prev) =>
                         checked ? [...prev, category] : prev.filter((c) => c !== category),
                       )
@@ -540,7 +479,7 @@ export function EventManager({
                 <DropdownMenuCheckboxItem
                   key={color.value}
                   checked={selectedColors.includes(color.value)}
-                  onCheckedChange={(checked) => {
+                  onCheckedChange={(checked: boolean) => {
                     setSelectedColors((prev) =>
                       checked ? [...prev, color.value] : prev.filter((c) => c !== color.value),
                     )
@@ -555,44 +494,15 @@ export function EventManager({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Tag Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                <Filter className="h-4 w-4" />
-                Tags
-                {selectedTags.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1">
-                    {selectedTags.length}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Filter by Tag</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {availableTags.map((tag) => (
-                <DropdownMenuCheckboxItem
-                  key={tag}
-                  checked={selectedTags.includes(tag)}
-                  onCheckedChange={(checked) => {
-                    setSelectedTags((prev) => (checked ? [...prev, tag] : prev.filter((t) => t !== tag)))
-                  }}
-                >
-                  {tag}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {/* Category Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Button variant="ghost" size="md" className="gap-2 bg-transparent">
                 <Filter className="h-4 w-4" />
                 Categories
                 {selectedCategories.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1">
+                  <Badge variant="default" className="ml-1 h-5 px-1">
                     {selectedCategories.length}
                   </Badge>
                 )}
@@ -605,7 +515,7 @@ export function EventManager({
                 <DropdownMenuCheckboxItem
                   key={category}
                   checked={selectedCategories.includes(category)}
-                  onCheckedChange={(checked) => {
+                  onCheckedChange={(checked: boolean) => {
                     setSelectedCategories((prev) =>
                       checked ? [...prev, category] : prev.filter((c) => c !== category),
                     )
@@ -632,7 +542,7 @@ export function EventManager({
           {selectedColors.map((colorValue) => {
             const color = getColorClasses(colorValue)
             return (
-              <Badge key={colorValue} variant="secondary" className="gap-1">
+              <Badge key={colorValue} variant="default" className="gap-1">
                 <div className={cn("h-2 w-2 rounded-full", color.bg)} />
                 {color.name}
                 <button
@@ -644,19 +554,8 @@ export function EventManager({
               </Badge>
             )
           })}
-          {selectedTags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="gap-1">
-              {tag}
-              <button
-                onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
-                className="ml-1 hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
           {selectedCategories.map((category) => (
-            <Badge key={category} variant="secondary" className="gap-1">
+            <Badge key={category} variant="default" className="gap-1">
               {category}
               <button
                 onClick={() => setSelectedCategories((prev) => prev.filter((c) => c !== category))}
@@ -832,7 +731,7 @@ export function EventManager({
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={isCreating ? newEvent.category : selectedEvent?.category}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     isCreating
                       ? setNewEvent((prev) => ({ ...prev, category: value }))
                       : setSelectedEvent((prev) => (prev ? { ...prev, category: value } : null))
@@ -855,7 +754,7 @@ export function EventManager({
                 <Label htmlFor="color">Color</Label>
                 <Select
                   value={isCreating ? newEvent.color : selectedEvent?.color}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     isCreating
                       ? setNewEvent((prev) => ({ ...prev, color: value }))
                       : setSelectedEvent((prev) => (prev ? { ...prev, color: value } : null))
@@ -878,34 +777,16 @@ export function EventManager({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Tags</Label>
-              <div className="flex flex-wrap gap-2">
-                {availableTags.map((tag) => {
-                  const isSelected = isCreating ? newEvent.tags?.includes(tag) : selectedEvent?.tags?.includes(tag)
-                  return (
-                    <Badge
-                      key={tag}
-                      variant={isSelected ? "default" : "outline"}
-                      className="cursor-pointer transition-all hover:scale-105"
-                      onClick={() => toggleTag(tag, isCreating)}
-                    >
-                      {tag}
-                    </Badge>
-                  )
-                })}
-              </div>
-            </div>
           </div>
 
           <DialogFooter>
             {!isCreating && (
-              <Button variant="destructive" onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}>
+              <Button variant="primary" onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}>
                 Delete
               </Button>
             )}
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 setIsDialogOpen(false)
                 setIsCreating(false)
@@ -914,7 +795,7 @@ export function EventManager({
             >
               Cancel
             </Button>
-            <Button onClick={isCreating ? handleCreateEvent : handleUpdateEvent}>
+            <Button variant="primary" onClick={isCreating ? handleCreateEvent : handleUpdateEvent}>
               {isCreating ? "Create" : "Save"}
             </Button>
           </DialogFooter>
@@ -999,15 +880,10 @@ function EventCard({
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
-                    <Badge variant="secondary" className="text-[10px] h-5">
+                    <Badge variant="default" className="text-[10px] h-5">
                       {event.category}
                     </Badge>
                   )}
-                  {event.tags?.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-[10px] h-5">
-                      {tag}
-                    </Badge>
-                  ))}
                 </div>
               </div>
             </Card>
@@ -1042,15 +918,10 @@ function EventCard({
         {isHovered && (
           <div className="mt-2 flex flex-wrap gap-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
             {event.category && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="default" className="text-xs">
                 {event.category}
               </Badge>
             )}
-            {event.tags?.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
           </div>
         )}
       </div>
@@ -1096,15 +967,10 @@ function EventCard({
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="default" className="text-xs">
                       {event.category}
                     </Badge>
                   )}
-                  {event.tags?.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
                 </div>
               </div>
             </div>
@@ -1447,7 +1313,7 @@ function ListView({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {event.category && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="default" className="text-xs">
                                 {event.category}
                               </Badge>
                             )}
@@ -1466,15 +1332,6 @@ function ListView({
                               minute: "2-digit",
                             })}
                           </div>
-                          {event.tags && event.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {event.tags.map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-[10px] h-4 sm:text-xs sm:h-5">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>

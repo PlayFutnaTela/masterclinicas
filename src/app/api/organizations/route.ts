@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       }
 
       return Response.json(
-        organizations.map((org) => ({
+        organizations.map((org: any) => ({
           ...org,
           role: userRole, // Role global do usuário
         }))

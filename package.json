@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "supabase:test": "npx dotenv -e .env.local -- npx tsx src/lib/test-supabase.ts"
+    "supabase:test": "npx dotenv -e .env.local -- npx tsx src/lib/test-supabase.ts",
+    "test:webhook": "npx tsx scripts/test-webhook-n8n.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv-cli": "^11.0.0",
