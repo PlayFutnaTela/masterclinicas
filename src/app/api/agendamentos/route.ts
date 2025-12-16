@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/role-middleware";
-import { AppointmentStatus } from "@prisma/client";
 
 /**
  * GET /api/agendamentos
@@ -64,7 +63,7 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get("page") || "1");
         const limit = parseInt(searchParams.get("limit") || "10");
-        const status = searchParams.get("status") as AppointmentStatus | null;
+        const status = searchParams.get("status");
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
 
@@ -72,7 +71,7 @@ export async function GET(request: NextRequest) {
 
         const where: {
             organizationId?: string;
-            status?: AppointmentStatus;
+            status?: string;
             scheduledAt?: { gte?: Date; lte?: Date };
         } = {};
 
@@ -95,40 +94,118 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        const [appointments, total] = await Promise.all([
-            prisma.appointment.findMany({
-                where,
-                skip,
-                take: limit,
-                orderBy: { scheduledAt: "asc" },
-                include: {
-                    lead: {
-                        select: {
-                            id: true,
-                            name: true,
-                            phone: true,
-                            procedure: true,
+        // Tentar usar PG diretamente (mais resiliente para migração gradual). Se falhar, cair no Prisma.
+        try {
+            const { query } = await import("@/lib/pg");
+
+            // Montar WHERE dinamicamente (atenção à orderBy / pagination)
+            const whereClauses: string[] = ["organization_id = $1"];
+            const params: any[] = [organizationId];
+            let idx = 2;
+
+            if (status) {
+                whereClauses.push(`status = $${idx++}`);
+                params.push(status);
+            }
+
+            if (startDate) {
+                whereClauses.push(`scheduled_at >= $${idx++}`);
+                params.push(new Date(startDate));
+            }
+            if (endDate) {
+                whereClauses.push(`scheduled_at <= $${idx++}`);
+                params.push(new Date(endDate));
+            }
+
+            const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+            const appointmentsSql = `SELECT a.id, a.scheduled_at as "scheduledAt", a.status, a.notes, a.lead_id as "leadId", l.id as "lead.id", l.name as "lead.name", l.phone as "lead.phone", l.procedure as "lead.procedure"
+                FROM appointments a
+                LEFT JOIN leads l ON l.id = a.lead_id
+                ${whereSql}
+                ORDER BY a.scheduled_at ASC
+                OFFSET ${skip}
+                LIMIT ${limit}`;
+
+            const totalSql = `SELECT COUNT(*)::int as total FROM appointments a ${whereSql}`;
+
+            const [appointmentsRes, totalRes] = await Promise.all([
+                query(appointmentsSql, params),
+                query(totalSql, params),
+            ]);
+
+            const appointments = appointmentsRes.rows.map((row: any) => ({
+                id: row.id,
+                scheduledAt: row.scheduledAt,
+                status: row.status,
+                notes: row.notes,
+                lead: {
+                    id: row["lead.id"],
+                    name: row["lead.name"],
+                    phone: row["lead.phone"],
+                    procedure: row["lead.procedure"],
+                },
+            }));
+
+            const total = totalRes.rows[0]?.total || 0;
+
+            return NextResponse.json({
+                appointments,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
+        } catch (pgErr) {
+            console.warn("[API AGENDAMENTOS] PG fallback: erro ao usar pg, usando Prisma", pgErr);
+            const [appointments, total] = await Promise.all([
+                prisma.appointment.findMany({
+                    where,
+                    skip,
+                    take: limit,
+                    orderBy: { scheduledAt: "asc" },
+                    include: {
+                        lead: {
+                            select: {
+                                id: true,
+                                name: true,
+                                phone: true,
+                                procedure: true,
+                            },
                         },
                     },
-                },
-            }),
-            prisma.appointment.count({ where }),
-        ]);
+                }),
+                prisma.appointment.count({ where }),
+            ]);
 
-        return NextResponse.json({
-            appointments,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-        });
+            return NextResponse.json({
+                appointments,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
+        }
     } catch (error) {
         console.error("[API AGENDAMENTOS] GET - Erro completo:", error);
         console.error("[API AGENDAMENTOS] GET - Stack:", error instanceof Error ? error.stack : "N/A");
+
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
+
         return NextResponse.json(
-            { error: "Erro interno do servidor", details: error instanceof Error ? error.message : String(error) },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
@@ -248,8 +325,16 @@ export async function POST(request: NextRequest) {
         );
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
@@ -318,7 +403,7 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        const updateData: { status?: AppointmentStatus; notes?: string; updatedAt: Date } = {
+        const updateData: { status?: string; notes?: string; updatedAt: Date } = {
             updatedAt: new Date(),
         };
 
@@ -349,8 +434,16 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ success: true, appointment });
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
