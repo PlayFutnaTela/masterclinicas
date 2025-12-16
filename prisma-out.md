@@ -12,7 +12,7 @@ Resumo curto e pragmático para remover o Prisma do projeto sem quebrar a aplica
 
 Observação: utilize as credenciais em `supabase-cred.md` para configurar a conexão no `.env` local ao testar.
 
-Status atual: comecei a migração — adicionei `pg` e `src/lib/pg.ts`, implementei `/api/health`, e refatorei parcialmente `organizations` (GET), `agendamentos` (GET/POST/PATCH/DELETE) e `leads` (GET/POST/PATCH) para usar `pg` com fallback para Prisma. Próximo passo: refatorar métricas, webhooks e endpoints administrativos; remover arquivos do Prisma e executar testes em staging.
+Status atual: migração concluída para os principais endpoints — adicionei `pg` e `src/lib/pg.ts`, implementei `/api/health`, e refatorei `organizations`, `agendamentos`, `leads`, `metricas`, `admin organizations`, `webhooks` e páginas relacionadas para usar `pg` nativamente. A pasta `prisma/` (schema, seed, migrations) foi removida. Branch `feat/remove-prisma` foi empurrada e um PR está pronto para revisão (veja a URL retornada ao fazer push ou abra: https://github.com/PlayFutnaTela/masterclinicas/pull/new/feat/remove-prisma). Próximo passo recomendado: rodar testes E2E em staging e atualizar CI antes de merge.
 
 ### Etapa 1: Diagnóstico Completo
 1. Identificar todos os arquivos que utilizam Prisma (tipicamente arquivos contendo `import { PrismaClient }` ou similares)
