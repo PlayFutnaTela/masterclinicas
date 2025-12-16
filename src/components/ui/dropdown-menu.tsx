@@ -4,10 +4,21 @@ import { ChevronDown } from "lucide-react"
 
 interface DropdownMenuProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-const DropdownMenu = ({ children, ...props }: DropdownMenuProps) => {
-  const [open, setOpen] = useState(false)
+const DropdownMenu = ({ children, open: controlledOpen, onOpenChange, ...props }: DropdownMenuProps) => {
+  const [internalOpen, setInternalOpen] = useState(false)
+  
+  // Use controlled state if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = (newOpen: boolean) => {
+    if (controlledOpen === undefined) {
+      setInternalOpen(newOpen)
+    }
+    onOpenChange?.(newOpen)
+  }
 
   return (
     <div className="relative" {...props}>

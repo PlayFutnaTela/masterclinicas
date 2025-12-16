@@ -90,6 +90,9 @@ export function EventManager({
   const [selectedColors, setSelectedColors] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [openColorFilter, setOpenColorFilter] = useState(false)
+  const [openTagFilter, setOpenTagFilter] = useState(false)
+  const [openCategoryFilter, setOpenCategoryFilter] = useState(false)
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
@@ -372,7 +375,7 @@ export function EventManager({
         {/* Desktop: Original layout */}
         <div className="hidden sm:flex items-center gap-2">
           {/* Color Filter */}
-          <DropdownMenu>
+          <DropdownMenu open={openColorFilter} onOpenChange={setOpenColorFilter}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 bg-transparent">
                 <Filter className="h-4 w-4" />
@@ -384,7 +387,7 @@ export function EventManager({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 bg-white">
               <DropdownMenuLabel>Filtrar por Cor</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {colors.map((color) => (
@@ -395,6 +398,7 @@ export function EventManager({
                     setSelectedColors((prev) =>
                       checked ? [...prev, color.value] : prev.filter((c) => c !== color.value),
                     )
+                    setOpenColorFilter(false)
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -407,7 +411,7 @@ export function EventManager({
           </DropdownMenu>
 
           {/* Tag Filter */}
-          <DropdownMenu>
+          <DropdownMenu open={openTagFilter} onOpenChange={setOpenTagFilter}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 bg-transparent">
                 <Filter className="h-4 w-4" />
@@ -419,7 +423,7 @@ export function EventManager({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 bg-white">
               <DropdownMenuLabel>Filtrar por Tag</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {availableTags.map((tag) => (
@@ -428,6 +432,7 @@ export function EventManager({
                   checked={selectedTags.includes(tag)}
                   onCheckedChange={(checked: boolean) => {
                     setSelectedTags((prev) => (checked ? [...prev, tag] : prev.filter((t) => t !== tag)))
+                    setOpenTagFilter(false)
                   }}
                 >
                   {tag}
@@ -437,7 +442,7 @@ export function EventManager({
           </DropdownMenu>
 
           {/* Category Filter */}
-          <DropdownMenu>
+          <DropdownMenu open={openCategoryFilter} onOpenChange={setOpenCategoryFilter}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 bg-transparent">
                 <Filter className="h-4 w-4" />
@@ -449,7 +454,7 @@ export function EventManager({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 bg-white">
               <DropdownMenuLabel>Filtrar por Categoria</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {categories.map((category) => (
@@ -460,6 +465,7 @@ export function EventManager({
                     setSelectedCategories((prev) =>
                       checked ? [...prev, category] : prev.filter((c) => c !== category),
                     )
+                    setOpenCategoryFilter(false)
                   }}
                 >
                   {category}
@@ -577,7 +583,7 @@ export function EventManager({
 
       {/* Event Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>{isCreating ? "Criar Evento" : "Detalhes do Evento"}</DialogTitle>
             <DialogDescription>
@@ -822,7 +828,7 @@ function EventCard({
         </div>
         {isHovered && (
           <div className="absolute left-0 top-full z-50 mt-1 w-64 animate-in fade-in slide-in-from-top-2 duration-200">
-            <Card className="border-2 p-3 shadow-xl">
+            <Card className="border-2 p-3 shadow-xl bg-white">
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="font-semibold text-sm leading-tight">{event.title}</h4>
@@ -918,7 +924,7 @@ function EventCard({
       </div>
       {isHovered && (
         <div className="absolute left-0 top-full z-50 mt-1 w-72 animate-in fade-in slide-in-from-top-2 duration-200">
-          <Card className="border-2 p-4 shadow-xl">
+          <Card className="border-2 p-4 shadow-xl bg-white">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="font-semibold leading-tight">{event.title}</h4>

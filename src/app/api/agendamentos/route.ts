@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
             // Super admin pode ver agendamentos de todas as organizações (ou especificar uma via query param)
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId");
+            // Se super_admin não especificar organizationId, usar a dele (se houver) ou mostrar de todas
+            if (!organizationId) {
+                organizationId = userRecord.organizationId;
+            }
         } else {
             // Admin/operador vê apenas da sua organização associada
             organizationId = userRecord.organizationId;
@@ -67,12 +71,15 @@ export async function GET(request: NextRequest) {
         const skip = (page - 1) * limit;
 
         const where: {
-            organizationId: string;
+            organizationId?: string;
             status?: AppointmentStatus;
             scheduledAt?: { gte?: Date; lte?: Date };
-        } = {
-            organizationId, // ===== MULTI-TENANT: Filtrar por organizationId apenas =====
-        };
+        } = {};
+
+        // Se houver organizationId, adicionar ao filtro
+        if (organizationId) {
+            where.organizationId = organizationId;
+        }
 
         if (status) {
             where.status = status;
