@@ -1,7 +1,7 @@
 // API Route para gerenciamento de leads - Supabase Auth
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/pg";
 import { requireRole } from "@/lib/role-middleware";
 
 // Local LeadStatus type matching Prisma schema to remove dependency on @prisma/client
@@ -71,7 +71,6 @@ export async function GET(request: NextRequest) {
         ];
 
         try {
-            const { query } = await import("@/lib/pg");
             const whereClauses: string[] = ["l.organization_id = $1"];
             const params: any[] = [organizationId];
             let idx = 2;
@@ -128,32 +127,8 @@ export async function GET(request: NextRequest) {
                 pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
             });
         } catch (pgErr) {
-            console.warn("[API LEADS] PG fallback: erro ao usar pg, usando Prisma", pgErr);
-            const [leads, total] = await Promise.all([
-                prisma.lead.findMany({
-                    where,
-                    skip,
-                    take: limit,
-                    orderBy: { createdAt: "desc" },
-                    include: {
-                        appointments: {
-                            orderBy: { scheduledAt: "desc" },
-                            take: 1,
-                        },
-                    },
-                }),
-                prisma.lead.count({ where }),
-            ]);
-
-            return NextResponse.json({
-                leads,
-                pagination: {
-                    page,
-                    limit,
-                    total,
-                    totalPages: Math.ceil(total / limit),
-                },
-            });
+            console.error("[API LEADS] PG error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
@@ -185,17 +160,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
+        // Buscar role do usuário no banco via PG
+        const userRes = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes.rows || userRes.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
+        const userRole = userRes.rows[0].role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem criar leads =====
         requireRole(userRole, "operador");
@@ -205,24 +175,11 @@ export async function POST(request: NextRequest) {
         if (userRole === "super_admin") {
             const body = await request.json();
             organizationId = body.organizationId;
-            if (!organizationId) {
-                return NextResponse.json(
-                    { error: "Super admin deve especificar organizationId" },
-                    { status: 400 }
-                );
-            }
+            if (!organizationId) return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
         } else {
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            if (!defaultOrg) {
-                return NextResponse.json(
-                    { error: "Nenhuma organização encontrada" },
-                    { status: 400 }
-                );
-            }
-            organizationId = defaultOrg.id;
+            const defaultRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes.rows || defaultRes.rows.length === 0) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
+            organizationId = defaultRes.rows[0].id;
         }
 
         const body = await request.json();
@@ -249,35 +206,9 @@ export async function POST(request: NextRequest) {
 
             return NextResponse.json({ success: true, lead }, { status: 201 });
         } catch (pgErr) {
-            try {
-                const { query } = await import("@/lib/pg");
-                await query("ROLLBACK");
-            } catch (_) {
-                // ignore
-            }
-            console.warn("[API LEADS] PG fallback create: erro ao usar pg, usando Prisma", pgErr);
-            const lead = await prisma.lead.create({
-                data: {
-                    name,
-                    phone,
-                    procedure: procedure || "",
-                    source: source || "manual",
-                    notes,
-                    userId: user.id,
-                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                },
-            });
-
-            await prisma.metricEvent.create({
-                data: {
-                    type: "lead_received",
-                    metadata: { leadId: lead.id, source: "manual" },
-                    userId: user.id,
-                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                },
-            });
-
-            return NextResponse.json({ success: true, lead }, { status: 201 });
+            try { await query("ROLLBACK"); } catch(_) {}
+            console.error("[API LEADS] PG create error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
@@ -309,17 +240,12 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
+        // Buscar role do usuário no banco via PG
+        const userRes2 = await query("SELECT role FROM users WHERE id = $1 LIMIT 1", [user.id]);
+        if (!userRes2.rows || userRes2.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
+        const userRole = userRes2.rows[0].role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem atualizar leads =====
         requireRole(userRole, "operador");
@@ -330,24 +256,11 @@ export async function PATCH(request: NextRequest) {
         if (userRole === "super_admin") {
             body = await request.json();
             organizationId = body.organizationId;
-            if (!organizationId) {
-                return NextResponse.json(
-                    { error: "Super admin deve especificar organizationId" },
-                    { status: 400 }
-                );
-            }
+            if (!organizationId) return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
         } else {
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            if (!defaultOrg) {
-                return NextResponse.json(
-                    { error: "Nenhuma organização encontrada" },
-                    { status: 400 }
-                );
-            }
-            organizationId = defaultOrg.id;
+            const defaultRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+            if (!defaultRes.rows || defaultRes.rows.length === 0) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
+            organizationId = defaultRes.rows[0].id;
             body = await request.json();
         }
 
@@ -401,34 +314,9 @@ export async function PATCH(request: NextRequest) {
             await query("COMMIT");
             return NextResponse.json({ success: true, lead });
         } catch (pgErr) {
-            try {
-                const { query } = await import("@/lib/pg");
-                await query("ROLLBACK");
-            } catch (_) {
-                // ignore
-            }
-            console.warn("[API LEADS] PG fallback update: erro ao usar pg, usando Prisma", pgErr);
-            const lead = await prisma.lead.update({
-                where: {
-                    id,
-                    userId: user.id,
-                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-                },
-                data: updateData,
-            });
-
-            if (status === "qualificado") {
-                await prisma.metricEvent.create({
-                    data: {
-                        type: "qualified",
-                        metadata: { leadId: id },
-                        userId: user.id,
-                        organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-                    },
-                });
-            }
-
-            return NextResponse.json({ success: true, lead });
+            try { await query("ROLLBACK"); } catch(_) {}
+            console.error("[API LEADS] PG update error:", pgErr);
+            return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
         }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
