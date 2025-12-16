@@ -276,53 +276,88 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Verificar se o lead pertence ao usuário E à organização
-        const lead = await prisma.lead.findFirst({
-            where: {
-                id: leadId,
-                userId: user.id,
-                organizationId,
-            },
-        });
+        try {
+            const { query } = await import("@/lib/pg");
+            await query("BEGIN");
 
-        if (!lead) {
+            // Verificar se o lead pertence ao usuário E à organização
+            const leadRes = await query("SELECT id FROM leads WHERE id = $1 AND user_id = $2 AND organization_id = $3", [leadId, user.id, organizationId]);
+            if (!leadRes.rows || leadRes.rows.length === 0) {
+                await query("ROLLBACK");
+                return NextResponse.json(
+                    { error: "Lead não encontrado" },
+                    { status: 404 }
+                );
+            }
+
+            // Atualizar status do lead
+            await query("UPDATE leads SET status = $1, updated_at = now() WHERE id = $2", ["agendado", leadId]);
+
+            // Criar agendamento
+            const insertAppointmentSql = `INSERT INTO appointments (lead_id, scheduled_at, notes, user_id, organization_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+            const appointmentRes = await query(insertAppointmentSql, [leadId, new Date(scheduledAt), notes || null, user.id, organizationId]);
+            const appointment = appointmentRes.rows[0];
+
+            // Criar evento de métrica
+            await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                "scheduled",
+                JSON.stringify({ leadId, appointmentId: appointment.id }),
+                user.id,
+                organizationId,
+            ]);
+
+            await query("COMMIT");
+
             return NextResponse.json(
-                { error: "Lead não encontrado" },
-                { status: 404 }
+                { success: true, appointment },
+                { status: 201 }
+            );
+        } catch (pgErr) {
+            try { const { query } = await import("@/lib/pg"); await query("ROLLBACK"); } catch(_) {}
+            console.warn("[API AGENDAMENTOS] PG fallback create: erro ao usar pg, usando Prisma", pgErr);
+
+            // Fallback para Prisma
+            const lead = await prisma.lead.findFirst({
+                where: {
+                    id: leadId,
+                    userId: user.id,
+                    organizationId,
+                },
+            });
+
+            if (!lead) {
+                return NextResponse.json(
+                    { error: "Lead não encontrado" },
+                    { status: 404 }
+                );
+            }
+
+            await prisma.lead.update({ where: { id: leadId }, data: { status: "agendado" } });
+
+            const appointment = await prisma.appointment.create({
+                data: {
+                    leadId,
+                    scheduledAt: new Date(scheduledAt),
+                    notes,
+                    userId: user.id,
+                    organizationId,
+                },
+            });
+
+            await prisma.metricEvent.create({
+                data: {
+                    type: "scheduled",
+                    metadata: { leadId, appointmentId: appointment.id },
+                    userId: user.id,
+                    organizationId,
+                },
+            });
+
+            return NextResponse.json(
+                { success: true, appointment },
+                { status: 201 }
             );
         }
-
-        // Atualizar status do lead
-        await prisma.lead.update({
-            where: { id: leadId },
-            data: { status: "agendado" },
-        });
-
-        // Criar agendamento
-        const appointment = await prisma.appointment.create({
-            data: {
-                leadId,
-                scheduledAt: new Date(scheduledAt),
-                notes,
-                userId: user.id,
-                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-            },
-        });
-
-        // Criar evento de métrica
-        await prisma.metricEvent.create({
-            data: {
-                type: "scheduled",
-                metadata: { leadId, appointmentId: appointment.id },
-                userId: user.id,
-                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-            },
-        });
-
-        return NextResponse.json(
-            { success: true, appointment },
-            { status: 201 }
-        );
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
         const msg = error instanceof Error ? error.message : String(error);
@@ -410,28 +445,140 @@ export async function PATCH(request: NextRequest) {
         if (status) updateData.status = status;
         if (notes !== undefined) updateData.notes = notes;
 
-        const appointment = await prisma.appointment.update({
-            where: {
-                id,
-                userId: user.id,
-                organizationId,
-            },
-            data: updateData,
-        });
+        try {
+            const { query } = await import("@/lib/pg");
+            await query("BEGIN");
+            const setClauses: string[] = ["updated_at = $1"];
+            const params: any[] = [updateData.updatedAt];
+            let idx = 2;
 
-        // Criar evento de métrica para no-show
-        if (status === "no_show") {
-            await prisma.metricEvent.create({
-                data: {
-                    type: "no_show",
-                    metadata: { appointmentId: id },
+            if (updateData.status) {
+                setClauses.push(`status = $${idx++}`);
+                params.push(updateData.status);
+            }
+            if (updateData.notes !== undefined) {
+                setClauses.push(`notes = $${idx++}`);
+                params.push(updateData.notes);
+            }
+
+            params.push(id, user.id, organizationId);
+
+            const updateSql = `UPDATE appointments SET ${setClauses.join(", ")} WHERE id = $${idx++} AND user_id = $${idx++} AND organization_id = $${idx++} RETURNING *`;
+            const res = await query(updateSql, params);
+            const appointment = res.rows[0];
+
+            if (status === "no_show") {
+                await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                    "no_show",
+                    JSON.stringify({ appointmentId: id }),
+                    user.id,
+                    organizationId,
+                ]);
+            }
+
+            await query("COMMIT");
+            return NextResponse.json({ success: true, appointment });
+        } catch (pgErr) {
+            try { const { query } = await import("@/lib/pg"); await query("ROLLBACK"); } catch(_) {}
+            console.warn("[API AGENDAMENTOS] PG fallback update: erro ao usar pg, usando Prisma", pgErr);
+            const appointment = await prisma.appointment.update({
+                where: {
+                    id,
                     userId: user.id,
                     organizationId,
                 },
+                data: updateData,
             });
+
+            if (status === "no_show") {
+                await prisma.metricEvent.create({
+                    data: {
+                        type: "no_show",
+                        metadata: { appointmentId: id },
+                        userId: user.id,
+                        organizationId,
+                    },
+                });
+            }
+
+            return NextResponse.json({ success: true, appointment });
+        }
+    } catch (error) {
+        console.error("[API AGENDAMENTOS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
+        return NextResponse.json(
+            { error: "Erro interno do servidor", details: msg },
+            { status: 500 }
+        );
+    }
+}
+
+// DELETE /api/agendamentos
+export async function DELETE(request: NextRequest) {
+    try {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+            return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        return NextResponse.json({ success: true, appointment });
+        const body = await request.json();
+        const { id, organizationId: providedOrg } = body;
+
+        if (!id) return NextResponse.json({ error: "ID do agendamento é obrigatório" }, { status: 400 });
+
+        // Buscar role do usuário
+        const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+        if (!userRecord) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+        const userRole = userRecord.role;
+        requireRole(userRole, "operador");
+
+        // Determinar organizationId
+        let organizationId: string;
+        if (userRole === "super_admin") {
+            if (!providedOrg) return NextResponse.json({ error: "Super admin deve especificar organizationId" }, { status: 400 });
+            organizationId = providedOrg;
+        } else {
+            const defaultOrg = await prisma.organization.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
+            if (!defaultOrg) return NextResponse.json({ error: "Nenhuma organização encontrada" }, { status: 400 });
+            organizationId = defaultOrg.id;
+        }
+
+        try {
+            const { query } = await import("@/lib/pg");
+            const res = await query("DELETE FROM appointments WHERE id = $1 AND user_id = $2 AND organization_id = $3 RETURNING *", [id, user.id, organizationId]);
+            const deleted = res.rows[0];
+            if (!deleted) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+
+            // opcional: criar evento de métrica para exclusão
+            await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                "no_show",
+                JSON.stringify({ appointmentId: id }),
+                user.id,
+                organizationId,
+            ]).catch(() => {});
+
+            return NextResponse.json({ success: true, deleted });
+        } catch (pgErr) {
+            console.warn("[API AGENDAMENTOS] PG fallback delete: erro ao usar pg, usando Prisma", pgErr);
+            const deleted = await prisma.appointment.deleteMany({ where: { id, userId: user.id, organizationId } });
+            if (!deleted.count) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+            await prisma.metricEvent.create({ data: { type: "no_show", metadata: { appointmentId: id }, userId: user.id, organizationId } }).catch(() => {});
+            return NextResponse.json({ success: true, deleted });
+        }
+    } catch (error) {
+        console.error("[API AGENDAMENTOS] DELETE - Erro:", error);
+        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+    }
+}
     } catch (error) {
         console.error("[API AGENDAMENTOS] Erro:", error);
         const msg = error instanceof Error ? error.message : String(error);

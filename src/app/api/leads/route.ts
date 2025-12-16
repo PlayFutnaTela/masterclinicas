@@ -18,17 +18,15 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        // Buscar role do usuário no banco
-        const userRecord = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-        });
-
-        if (!userRecord) {
+// Buscar role do usuário no banco via PG (mais confiável para remover Prisma)
+    try {
+        const { query } = await import("@/lib/pg");
+        const userRes = await query("SELECT role, organization_id as \"organizationId\" FROM users WHERE id = $1", [user.id]);
+        if (!userRes || userRes.rows.length === 0) {
             return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
         }
-
-        const userRole = userRecord.role;
+        const userRow = userRes.rows[0];
+        const userRole = userRow.role;
 
         // ===== ROLE VALIDATION: Apenas admin e operador podem ver leads =====
         requireRole(userRole, "operador");
@@ -36,16 +34,16 @@ export async function GET(request: NextRequest) {
         // Determinar organização
         let organizationId: string | null = null;
         if (userRole === "super_admin") {
-            // Super admin pode ver leads de todas as organizações
             const url = new URL(request.url);
             organizationId = url.searchParams.get("organizationId");
         } else {
             // Admin/operador vê apenas da organização padrão
-            const defaultOrg = await prisma.organization.findFirst({
-                orderBy: { createdAt: "asc" },
-                select: { id: true }
-            });
-            organizationId = defaultOrg?.id || null;
+            if (userRow.organizationId) {
+                organizationId = userRow.organizationId;
+            } else {
+                const orgRes = await query("SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1");
+                organizationId = orgRes.rows[0]?.id || null;
+            }
         }
 
         if (!organizationId) {
@@ -63,56 +61,103 @@ export async function GET(request: NextRequest) {
 
         const skip = (page - 1) * limit;
 
-        const where: {
-            userId: string;
-            organizationId: string;
-            status?: LeadStatus;
-            OR?: Array<{ name: { contains: string; mode: "insensitive" } } | { phone: { contains: string } }>;
-        } = {
-            userId: user.id,
-            organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-        };
+        try {
+            const { query } = await import("@/lib/pg");
+            const whereClauses: string[] = ["l.organization_id = $1"];
+            const params: any[] = [organizationId];
+            let idx = 2;
 
-        if (status) {
-            where.status = status;
-        }
+            if (status) {
+                whereClauses.push(`l.status = $${idx++}`);
+                params.push(status);
+            }
 
-        if (search) {
-            where.OR = [
-                { name: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search } },
-            ];
-        }
+            if (search) {
+                whereClauses.push(`(LOWER(l.name) LIKE $${idx} OR l.phone LIKE $${idx})`);
+                params.push(`%${search.toLowerCase()}%`);
+                idx++;
+            }
 
-        const [leads, total] = await Promise.all([
-            prisma.lead.findMany({
-                where,
-                skip,
-                take: limit,
-                orderBy: { createdAt: "desc" },
-                include: {
-                    appointments: {
-                        orderBy: { scheduledAt: "desc" },
-                        take: 1,
+            const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+            const leadsSql = `SELECT l.*, a.id as appointment_id, a.scheduled_at as appointment_scheduled_at, a.status as appointment_status
+                FROM leads l
+                LEFT JOIN LATERAL (
+                    SELECT id, scheduled_at, status FROM appointments WHERE lead_id = l.id ORDER BY scheduled_at DESC LIMIT 1
+                ) a ON true
+                ${whereSql}
+                ORDER BY l.created_at DESC
+                OFFSET ${skip}
+                LIMIT ${limit}`;
+
+            const totalSql = `SELECT COUNT(*)::int as total FROM leads l ${whereSql}`;
+
+            const [leadsRes, totalRes] = await Promise.all([
+                query(leadsSql, params),
+                query(totalSql, params),
+            ]);
+
+            const leads = leadsRes.rows.map((row: any) => ({
+                id: row.id,
+                name: row.name,
+                phone: row.phone,
+                procedure: row.procedure,
+                status: row.status,
+                source: row.source,
+                notes: row.notes,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+                appointments: row.appointment_id
+                    ? [{ id: row.appointment_id, scheduledAt: row.appointment_scheduled_at, status: row.appointment_status }]
+                    : [],
+            }));
+
+            const total = totalRes.rows[0]?.total || 0;
+
+            return NextResponse.json({
+                leads,
+                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+            });
+        } catch (pgErr) {
+            console.warn("[API LEADS] PG fallback: erro ao usar pg, usando Prisma", pgErr);
+            const [leads, total] = await Promise.all([
+                prisma.lead.findMany({
+                    where,
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: "desc" },
+                    include: {
+                        appointments: {
+                            orderBy: { scheduledAt: "desc" },
+                            take: 1,
+                        },
                     },
-                },
-            }),
-            prisma.lead.count({ where }),
-        ]);
+                }),
+                prisma.lead.count({ where }),
+            ]);
 
-        return NextResponse.json({
-            leads,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-        });
+            return NextResponse.json({
+                leads,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
+        }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
@@ -181,33 +226,62 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const lead = await prisma.lead.create({
-            data: {
-                name,
-                phone,
-                procedure: procedure || "",
-                source: source || "manual",
-                notes,
-                userId: user.id,
-                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-            },
-        });
+        try {
+            const { query } = await import("@/lib/pg");
+            await query("BEGIN");
+            const insertLeadSql = `INSERT INTO leads (name, phone, procedure, source, notes, user_id, organization_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
+            const leadRes = await query(insertLeadSql, [name, phone, procedure || "", source || "manual", notes || null, user.id, organizationId]);
+            const lead = leadRes.rows[0];
 
-        // Criar evento de métrica
-        await prisma.metricEvent.create({
-            data: {
-                type: "lead_received",
-                metadata: { leadId: lead.id, source: "manual" },
-                userId: user.id,
-                organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
-            },
-        });
+            const insertMetricSql = `INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`;
+            await query(insertMetricSql, ["lead_received", JSON.stringify({ leadId: lead.id, source: "manual" }), user.id, organizationId]);
 
-        return NextResponse.json({ success: true, lead }, { status: 201 });
+            await query("COMMIT");
+
+            return NextResponse.json({ success: true, lead }, { status: 201 });
+        } catch (pgErr) {
+            try {
+                const { query } = await import("@/lib/pg");
+                await query("ROLLBACK");
+            } catch (_) {
+                // ignore
+            }
+            console.warn("[API LEADS] PG fallback create: erro ao usar pg, usando Prisma", pgErr);
+            const lead = await prisma.lead.create({
+                data: {
+                    name,
+                    phone,
+                    procedure: procedure || "",
+                    source: source || "manual",
+                    notes,
+                    userId: user.id,
+                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
+                },
+            });
+
+            await prisma.metricEvent.create({
+                data: {
+                    type: "lead_received",
+                    metadata: { leadId: lead.id, source: "manual" },
+                    userId: user.id,
+                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
+                },
+            });
+
+            return NextResponse.json({ success: true, lead }, { status: 201 });
+        }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
@@ -284,32 +358,81 @@ export async function PATCH(request: NextRequest) {
         if (status) updateData.status = status;
         if (notes !== undefined) updateData.notes = notes;
 
-        const lead = await prisma.lead.update({
-            where: {
-                id,
-                userId: user.id,
-                organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
-            },
-            data: updateData,
-        });
+        try {
+            const { query } = await import("@/lib/pg");
+            await query("BEGIN");
+            const setClauses: string[] = ["updated_at = $1"];
+            const params: any[] = [updateData.updatedAt];
+            let idx = 2;
 
-        // Criar evento de métrica para mudança de status
-        if (status === "qualificado") {
-            await prisma.metricEvent.create({
-                data: {
-                    type: "qualified",
-                    metadata: { leadId: id },
+            if (updateData.status) {
+                setClauses.push(`status = $${idx++}`);
+                params.push(updateData.status);
+            }
+            if (updateData.notes !== undefined) {
+                setClauses.push(`notes = $${idx++}`);
+                params.push(updateData.notes);
+            }
+
+            params.push(id, user.id, organizationId);
+
+            const updateSql = `UPDATE leads SET ${setClauses.join(", ")} WHERE id = $${idx++} AND user_id = $${idx++} AND organization_id = $${idx++} RETURNING *`;
+            const res = await query(updateSql, params);
+            const lead = res.rows[0];
+
+            if (status === "qualificado") {
+                await query(`INSERT INTO metric_events (type, metadata, user_id, organization_id) VALUES ($1, $2::jsonb, $3, $4)`, [
+                    "qualified",
+                    JSON.stringify({ leadId: id }),
+                    user.id,
+                    organizationId,
+                ]);
+            }
+
+            await query("COMMIT");
+            return NextResponse.json({ success: true, lead });
+        } catch (pgErr) {
+            try {
+                const { query } = await import("@/lib/pg");
+                await query("ROLLBACK");
+            } catch (_) {
+                // ignore
+            }
+            console.warn("[API LEADS] PG fallback update: erro ao usar pg, usando Prisma", pgErr);
+            const lead = await prisma.lead.update({
+                where: {
+                    id,
                     userId: user.id,
-                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
+                    organizationId, // ===== MULTI-TENANT: Adicionar organizationId ao WHERE =====
                 },
+                data: updateData,
             });
-        }
 
-        return NextResponse.json({ success: true, lead });
+            if (status === "qualificado") {
+                await prisma.metricEvent.create({
+                    data: {
+                        type: "qualified",
+                        metadata: { leadId: id },
+                        userId: user.id,
+                        organizationId, // ===== MULTI-TENANT: Adicionar organizationId na criação =====
+                    },
+                });
+            }
+
+            return NextResponse.json({ success: true, lead });
+        }
     } catch (error) {
         console.error("[API LEADS] Erro:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const isDbDown = msg.includes("Can't reach database server") || msg.includes("PrismaClientInitializationError") || msg.includes('Environment variable not found');
+        if (isDbDown) {
+            return NextResponse.json(
+                { error: "Banco de dados indisponível", details: msg },
+                { status: 503 }
+            );
+        }
         return NextResponse.json(
-            { error: "Erro interno do servidor" },
+            { error: "Erro interno do servidor", details: msg },
             { status: 500 }
         );
     }
